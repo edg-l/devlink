@@ -11,7 +11,7 @@
 </script>
 
 <ToolCard toolName="Grep" {input} {result}>
-	<div class="px-3 py-2 space-y-2">
+	<div class="space-y-2 px-3 py-2">
 		<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
 			<span class="text-zinc-400">
 				<span class="text-zinc-500">pattern:</span>
@@ -33,8 +33,7 @@
 
 		{#if result}
 			<pre
-				class="overflow-x-auto overflow-y-auto max-h-64 rounded bg-zinc-900 p-3 text-xs text-zinc-100 font-mono"
-			>{result}</pre>
+				class="max-h-64 overflow-x-auto overflow-y-auto rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-100">{result}</pre>
 		{/if}
 	</div>
 </ToolCard>

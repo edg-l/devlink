@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { connectSSE } from '$lib/client/sse';
 	import { parseEvent, mergeToolResults, type Block } from '$lib/client/event-parser';
@@ -31,6 +32,9 @@
 	let rawBlocks: Block[] = [];
 	let pendingPermission = $state<PendingPermission | null>(null);
 	let status = $state<string>('connecting');
+	let mode = $state<'active' | 'history'>('active');
+	let historyProjectPath = $state('');
+	let historyClaudeSessionId = $state('');
 
 	// Prompt input
 	let promptText = $state('');
@@ -73,6 +77,8 @@
 				status = sessionMeta?.status ?? 'connected';
 			},
 			onError: () => {
+				// Don't retry if we're in history mode or session doesn't exist
+				if (mode === 'history') return;
 				status = 'error';
 				// Reconnect after 3 seconds
 				setTimeout(connectStream, 3000);
@@ -117,12 +123,55 @@
 			const res = await fetch('/api/sessions');
 			if (res.ok) {
 				const sessions: SessionMeta[] = await res.json();
-				sessionMeta = sessions.find((s) => s.id === sessionId) ?? null;
-				if (sessionMeta) status = sessionMeta.status;
+				const found = sessions.find((s) => s.id === sessionId);
+				if (found) {
+					sessionMeta = found;
+					status = found.status;
+					mode = 'active';
+					return;
+				}
 			}
 		} catch {
 			// Ignore
 		}
+
+		// Not found in active sessions — try history DB
+		try {
+			const res = await fetch(`/api/sessions/${sessionId}/history`);
+			if (res.ok) {
+				const data = (await res.json()) as {
+					sessionId: string;
+					claudeSessionId?: string;
+					projectPath: string;
+					model?: string;
+					status: string;
+					totalCost?: number | null;
+					createdAt: string;
+					endedAt: string;
+				};
+				mode = 'history';
+				status = 'history';
+				historyProjectPath = data.projectPath;
+				historyClaudeSessionId = data.claudeSessionId ?? '';
+				sessionMeta = {
+					id: sessionId,
+					projectPath: data.projectPath,
+					status: 'history',
+					permissionMode: 'ask',
+					model: data.model,
+					createdAt: data.createdAt,
+					lastActivity: data.endedAt || data.createdAt,
+					totalCost: data.totalCost ?? undefined
+				};
+				return;
+			}
+		} catch {
+			// Ignore
+		}
+
+		// Neither active nor history — mark as not found
+		mode = 'history';
+		status = 'not-found';
 	}
 
 	async function sendMessage() {
@@ -130,6 +179,17 @@
 		const msg = promptText.trim();
 		promptText = '';
 		sending = true;
+
+		// Show user message in the stream immediately
+		addRawBlocks([
+			{
+				id: `block-user-${Date.now()}`,
+				type: 'user-message',
+				timestamp: new Date(),
+				content: msg
+			}
+		]);
+
 		try {
 			await fetch(`/api/sessions/${sessionId}/message`, {
 				method: 'POST',
@@ -151,10 +211,51 @@
 		}
 	}
 
+	async function resumeSession() {
+		const prompt = promptText.trim();
+
+		// Find the projectId matching the historyProjectPath
+		let projectId = '';
+		try {
+			const res = await fetch('/api/projects');
+			if (res.ok) {
+				const projects = (await res.json()) as Array<{ id: string; path: string }>;
+				const match = projects.find((p) => p.path === historyProjectPath);
+				if (match) projectId = match.id;
+			}
+		} catch {
+			// Ignore
+		}
+
+		if (!projectId) return;
+
+		try {
+			const res = await fetch('/api/sessions', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					prompt: prompt || undefined,
+					projectId,
+					resume: historyClaudeSessionId || sessionId
+				})
+			});
+			if (res.ok) {
+				const newSession = (await res.json()) as { id: string };
+				goto(`/session/${newSession.id}`);
+			}
+		} catch {
+			// Ignore
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
-		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			sendMessage();
+			if (mode === 'history') {
+				resumeSession();
+			} else {
+				sendMessage();
+			}
 		}
 	}
 
@@ -195,7 +296,10 @@
 			rawBlocks = [];
 			blocks = [];
 			pendingPermission = null;
-			loadSession().then(() => connectStream());
+			mode = 'active';
+			loadSession().then(() => {
+				if (mode === 'active') connectStream();
+			});
 		}
 		return () => {
 			sseClose?.();
@@ -214,7 +318,9 @@
 						? 'bg-green-400'
 						: status === 'error'
 							? 'bg-red-400'
-							: 'bg-zinc-500'}
+							: status === 'history'
+								? 'bg-zinc-600'
+								: 'bg-zinc-500'}
 				"
 				></span>
 				<span class="truncate text-sm font-medium text-zinc-200">
@@ -223,15 +329,26 @@
 				{#if sessionMeta?.model}
 					<span class="text-xs text-zinc-500">{sessionMeta.model}</span>
 				{/if}
-				<span class="text-xs text-zinc-600">{elapsedDisplay}</span>
+				{#if mode === 'active'}
+					<span class="text-xs text-zinc-600">{elapsedDisplay}</span>
+				{/if}
 			</div>
 			{#if sessionMeta?.projectPath}
 				<p class="mt-0.5 truncate text-xs text-zinc-600">{sessionMeta.projectPath}</p>
 			{/if}
 		</div>
 
-		<!-- Permission mode toggle -->
-		{#if sessionMeta}
+		{#if mode === 'history'}
+			<button
+				onclick={resumeSession}
+				class="flex-shrink-0 rounded border border-zinc-600 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+			>
+				Resume
+			</button>
+		{/if}
+
+		<!-- Permission mode toggle (active sessions only) -->
+		{#if sessionMeta && mode === 'active'}
 			<div class="flex-shrink-0">
 				<PermissionModeToggle
 					mode={sessionMeta.permissionMode}
@@ -243,7 +360,7 @@
 	</div>
 
 	<!-- Stream area -->
-	<div class="min-h-0 flex-1">
+	<div class="min-h-0 flex-1 overflow-y-auto">
 		<StreamView {blocks} {sessionId} {pendingPermission} />
 	</div>
 
@@ -253,38 +370,57 @@
 	>
 		<span>status: {status}</span>
 		{#if lastResult}
-			<span>cost: ${lastResult.totalCostUsd.toFixed(4)}</span>
-			<span>
-				tokens: {(lastResult.usage.inputTokens + lastResult.usage.outputTokens).toLocaleString()}
-			</span>
-			<span>time: {(lastResult.durationMs / 1000).toFixed(1)}s</span>
+			{@const totalTokens = lastResult.usage.inputTokens + lastResult.usage.outputTokens}
+			{@const ctxPercent = Math.round((lastResult.usage.inputTokens / 200000) * 100)}
+			<span>context: {ctxPercent}% ({totalTokens.toLocaleString()} tokens)</span>
 		{/if}
-		<div class="ml-auto">
-			<button
-				onclick={stopSession}
-				disabled={status !== 'running' && status !== 'starting'}
-				class="rounded border border-red-700 px-2 py-0.5 text-xs text-red-400 hover:bg-red-950 disabled:opacity-30"
-				>Stop</button
-			>
-		</div>
+		{#if mode === 'active'}
+			<div class="ml-auto">
+				<button
+					onclick={stopSession}
+					disabled={status !== 'running' && status !== 'starting'}
+					class="rounded border border-red-700 px-2 py-0.5 text-xs text-red-400 hover:bg-red-950 disabled:opacity-30"
+					>Stop</button
+				>
+			</div>
+		{/if}
 	</div>
 
-	<!-- Prompt input bar -->
-	<div class="flex flex-shrink-0 items-end gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
-		<textarea
-			bind:value={promptText}
-			use:autogrow
-			onkeydown={handleKeydown}
-			placeholder="Send a message… (Ctrl+Enter to send)"
-			rows="1"
-			class="min-h-[36px] flex-1 resize-none rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
-		></textarea>
-		<button
-			onclick={sendMessage}
-			disabled={!promptText.trim() || sending}
-			class="flex-shrink-0 rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
-		>
-			{sending ? '…' : 'Send'}
-		</button>
-	</div>
+	<!-- Prompt input bar (active) or resume bar (history) -->
+	{#if mode === 'active'}
+		<div class="flex flex-shrink-0 items-end gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
+			<textarea
+				bind:value={promptText}
+				use:autogrow
+				onkeydown={handleKeydown}
+				placeholder="Send a message… (Shift+Enter for newline)"
+				rows="1"
+				class="min-h-[36px] flex-1 resize-none rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+			></textarea>
+			<button
+				onclick={sendMessage}
+				disabled={!promptText.trim() || sending}
+				class="flex-shrink-0 rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
+			>
+				{sending ? '…' : 'Send'}
+			</button>
+		</div>
+	{:else}
+		<div class="flex flex-shrink-0 items-end gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
+			<textarea
+				bind:value={promptText}
+				use:autogrow
+				onkeydown={handleKeydown}
+				placeholder="Optional message to resume with… (Ctrl+Enter)"
+				rows="1"
+				class="min-h-[36px] flex-1 resize-none rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+			></textarea>
+			<button
+				onclick={resumeSession}
+				class="flex-shrink-0 rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
+			>
+				Resume
+			</button>
+		</div>
+	{/if}
 </div>

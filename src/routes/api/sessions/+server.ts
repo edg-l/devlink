@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
 import { sessionManager, type PermissionMode } from '$lib/server/session-manager';
 import { spawnSession } from '$lib/server/session-spawn';
+import { log } from '$lib/server/logger';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
@@ -47,7 +48,7 @@ export const POST: RequestHandler = async (event) => {
 		resume?: string;
 	};
 
-	if (!prompt || !projectId) {
+	if ((!prompt && !resume) || !projectId) {
 		return json({ error: 'prompt and projectId are required' }, { status: 400 });
 	}
 
@@ -58,6 +59,7 @@ export const POST: RequestHandler = async (event) => {
 
 	const [proj] = await db.select().from(project).where(eq(project.id, projectId)).limit(1);
 	if (!proj) {
+		log.sessions.warn({ projectId }, 'session creation failed: project not found');
 		return json({ error: 'Project not found' }, { status: 404 });
 	}
 

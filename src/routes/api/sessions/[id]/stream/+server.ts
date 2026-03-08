@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sessionManager } from '$lib/server/session-manager';
 import { sseResponse } from '$lib/server/sse';
+import { log } from '$lib/server/logger';
 
 export const GET: RequestHandler = async (event) => {
 	if (!event.locals.user) {
@@ -13,6 +14,8 @@ export const GET: RequestHandler = async (event) => {
 	if (!session) {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
+
+	log.sse.info({ sessionId: id, bufferedEvents: session.events.length }, 'SSE client connected');
 
 	return sseResponse(event, (send) => {
 		// Replay buffered events
@@ -29,6 +32,7 @@ export const GET: RequestHandler = async (event) => {
 			session.emitter.on('event', onEvent);
 
 			event.request.signal.addEventListener('abort', () => {
+				log.sse.info({ sessionId: id }, 'SSE client disconnected');
 				session.emitter.off('event', onEvent);
 				resolve();
 			});

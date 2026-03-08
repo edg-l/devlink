@@ -22,7 +22,7 @@
 
 	let prompt = $state('');
 	let projectId = $state('');
-	let model = $state('claude-sonnet-4-5');
+	let model = $state('claude-sonnet-4-6');
 	let permissionMode = $state<PermissionMode>('ask');
 	let submitting = $state(false);
 
@@ -34,8 +34,8 @@
 	});
 
 	const models = [
-		{ value: 'claude-opus-4-5', label: 'Opus' },
-		{ value: 'claude-sonnet-4-5', label: 'Sonnet' },
+		{ value: 'claude-opus-4-6', label: 'Opus' },
+		{ value: 'claude-sonnet-4-6', label: 'Sonnet' },
 		{ value: 'claude-haiku-4-5', label: 'Haiku' }
 	];
 

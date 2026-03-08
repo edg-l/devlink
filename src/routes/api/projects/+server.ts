@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
+import { log } from '$lib/server/logger';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
@@ -31,6 +32,7 @@ export const POST: RequestHandler = async (event) => {
 	try {
 		stat = fs.statSync(projectPath);
 	} catch {
+		log.projects.warn({ path: projectPath }, 'project path does not exist');
 		return json({ error: 'path does not exist on filesystem' }, { status: 400 });
 	}
 
@@ -45,5 +47,6 @@ export const POST: RequestHandler = async (event) => {
 		.values({ path: projectPath, name: derivedName })
 		.returning();
 
+	log.projects.info({ id: inserted.id, name: derivedName, path: projectPath }, 'project added');
 	return json(inserted, { status: 201 });
 };

@@ -18,7 +18,7 @@
 </script>
 
 <ToolCard toolName="Write" {input} {result}>
-	<div class="px-3 py-2 space-y-2">
+	<div class="space-y-2 px-3 py-2">
 		<p class="text-xs text-zinc-400">
 			<span class="text-zinc-500">file:</span>
 			<span class="font-mono text-zinc-200">{input.file_path}</span>
@@ -26,8 +26,7 @@
 
 		<div>
 			<pre
-				class="overflow-x-auto overflow-y-auto max-h-64 rounded bg-zinc-900 p-3 text-xs text-zinc-100 font-mono"
-			>{previewText}</pre>
+				class="max-h-64 overflow-x-auto overflow-y-auto rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-100">{previewText}</pre>
 			{#if remainingCount > 0}
 				<p class="mt-1 text-xs text-zinc-500">… {remainingCount} more lines</p>
 			{/if}

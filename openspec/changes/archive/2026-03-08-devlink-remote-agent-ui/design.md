@@ -7,6 +7,7 @@ Claude CLI supports `--output-format stream-json` and `--input-format stream-jso
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Remote control of Claude CLI from any browser (phone or laptop)
 - Real-time streaming of Claude's output rendered as rich typed blocks
 - Permission prompt proxying with four switchable modes (Plan, Ask All, Auto-Edit, Full Auto)
@@ -14,6 +15,7 @@ Claude CLI supports `--output-format stream-json` and `--input-format stream-jso
 - Secure single-user access with device pairing
 
 **Non-Goals:**
+
 - Multi-user / team support
 - Using the Claude API directly (subscription-only, CLI-based)
 - Using the Claude Agent SDK
@@ -57,16 +59,17 @@ Claude persists sessions in `~/.claude/projects/`. Devlink reads this directory 
 
 Stream-json events are parsed into a linear sequence of typed blocks. Each block type has a dedicated Svelte component:
 
-| Stream event | UI Component |
-|---|---|
-| `assistant.content[type=text]` | `MarkdownBlock` — rendered markdown with syntax-highlighted code |
-| `assistant.content[type=tool_use]` | `ToolCard` — collapsible card with icon per tool type |
-| `assistant.content[type=thinking]` | `ThinkingBlock` — collapsible thinking/reasoning |
-| `type=user` (tool_result) | Nested inside parent `ToolCard` |
-| `type=result` | `ResultBlock` — cost, tokens, duration summary |
-| `type=rate_limit_event` | `RateLimitBadge` — warning badge if rate limited |
+| Stream event                       | UI Component                                                     |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `assistant.content[type=text]`     | `MarkdownBlock` — rendered markdown with syntax-highlighted code |
+| `assistant.content[type=tool_use]` | `ToolCard` — collapsible card with icon per tool type            |
+| `assistant.content[type=thinking]` | `ThinkingBlock` — collapsible thinking/reasoning                 |
+| `type=user` (tool_result)          | Nested inside parent `ToolCard`                                  |
+| `type=result`                      | `ResultBlock` — cost, tokens, duration summary                   |
+| `type=rate_limit_event`            | `RateLimitBadge` — warning badge if rate limited                 |
 
 For tool cards, sub-components render tool-specific content:
+
 - `ReadCard`: file path + line count, expandable content
 - `EditCard`: inline unified diff with syntax highlighting
 - `WriteCard`: full file content preview
@@ -77,6 +80,7 @@ For tool cards, sub-components render tool-specific content:
 ### 6. Auth: better-auth + pairing code flow
 
 First boot creates an admin account (email/password). New devices pair via a 6-digit code:
+
 1. User triggers pairing on the server (or navigates to `/pair`)
 2. Server generates a 6-digit code, valid for 5 minutes, single-use
 3. Remote device enters the code at the login page

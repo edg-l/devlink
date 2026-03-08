@@ -17,6 +17,7 @@ Devlink is a personal development machine, but there's no way to supervise or dr
 ## Capabilities
 
 ### New Capabilities
+
 - `session-manager`: Server-side process manager that spawns Claude CLI processes, buffers stream-json events, and bridges stdin/stdout to SSE/POST endpoints
 - `permission-proxy`: MCP stdio server embedded in devlink that handles `--permission-prompt-tool` calls, proxies them to the browser, and supports four runtime-switchable permission modes (Plan, Ask All, Auto-Edit, Full Auto)
 - `stream-renderer`: Frontend component system that parses stream-json events into typed UI blocks — markdown bubbles, tool cards (Read/Edit/Write/Bash/Grep/Glob), inline diffs, terminal output with ANSI colors, session summary cards

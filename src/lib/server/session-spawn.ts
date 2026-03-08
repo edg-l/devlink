@@ -1,48 +1,76 @@
 import { spawn } from 'child_process';
-import { writeFileSync, unlinkSync, mkdtempSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 import { createInterface } from 'readline';
-import { sessionManager, type Session, type StreamEvent } from './session-manager';
+import {
+	sessionManager,
+	type Session,
+	type StreamEvent,
+	type PermissionResponse
+} from './session-manager';
+import { log } from './logger';
+import { eq } from 'drizzle-orm';
+import { db } from './db';
+import { claudeSession as sessionTable } from './db/schema';
 
-const DEVLINK_PORT = process.env.DEVLINK_PORT || process.env.PORT || '3000';
-export const INTERNAL_SECRET = crypto.randomUUID();
+function saveSessionToDb(session: Session): void {
+	try {
+		db.insert(sessionTable)
+			.values({
+				id: session.id,
+				claudeSessionId: session.claudeSessionId ?? null,
+				projectId: session.projectId,
+				projectPath: session.projectPath,
+				model: session.model ?? null,
+				permissionMode: session.permissionMode,
+				status: 'running',
+				totalCost: null,
+				createdAt: session.createdAt,
+				endedAt: null
+			})
+			.onConflictDoNothing()
+			.run();
+		log.spawn.info({ sessionId: session.id }, 'session saved to db');
+	} catch (err) {
+		log.spawn.error({ sessionId: session.id, err }, 'failed to save session to db');
+	}
+}
 
-function createMcpConfig(sessionId: string): string {
-	const mcpServerScript = join(process.cwd(), 'src', 'lib', 'server', 'mcp-permission-server.mjs');
-	const config = {
-		mcpServers: {
-			devlink: {
-				command: 'node',
-				args: [mcpServerScript],
-				env: {
-					DEVLINK_SESSION_ID: sessionId,
-					DEVLINK_PORT: DEVLINK_PORT,
-					DEVLINK_INTERNAL_SECRET: INTERNAL_SECRET
-				}
-			}
-		}
-	};
-	const dir = mkdtempSync(join(tmpdir(), 'devlink-mcp-'));
-	const configPath = join(dir, 'mcp.json');
-	writeFileSync(configPath, JSON.stringify(config));
-	return configPath;
+function updateSessionInDb(session: Session, exitStatus: string): void {
+	try {
+		db.update(sessionTable)
+			.set({
+				claudeSessionId: session.claudeSessionId ?? null,
+				status: exitStatus,
+				totalCost: session.totalCost ? Math.round(session.totalCost * 10000) : null,
+				endedAt: new Date()
+			})
+			.where(eq(sessionTable.id, session.id))
+			.run();
+		log.spawn.info({ sessionId: session.id, status: exitStatus }, 'session updated in db');
+	} catch (err) {
+		log.spawn.error({ sessionId: session.id, err }, 'failed to update session in db');
+	}
 }
 
 export function spawnSession(session: Session, prompt: string, resumeSessionId?: string): void {
-	const mcpConfigPath = createMcpConfig(session.id);
+	// Map devlink permission modes to Claude CLI permission modes
+	const permissionModeMap: Record<string, string> = {
+		plan: 'plan',
+		ask: 'default',
+		'auto-edit': 'acceptEdits',
+		auto: 'bypassPermissions'
+	};
+	const cliPermissionMode = permissionModeMap[session.permissionMode] ?? 'default';
 
 	const args = [
-		'-p',
 		'--output-format',
 		'stream-json',
 		'--input-format',
 		'stream-json',
 		'--verbose',
 		'--permission-prompt-tool',
-		'mcp__devlink__permission_prompt',
-		'--mcp-config',
-		mcpConfigPath
+		'stdio',
+		'--permission-mode',
+		cliPermissionMode
 	];
 
 	if (session.model) {
@@ -53,7 +81,17 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 		args.push('--resume', resumeSessionId);
 	}
 
-	args.push(prompt);
+	log.spawn.info(
+		{
+			sessionId: session.id,
+			cwd: session.projectPath,
+			model: session.model,
+			permissionMode: cliPermissionMode,
+			resume: resumeSessionId,
+			args
+		},
+		'spawning claude process'
+	);
 
 	let child: ReturnType<typeof spawn>;
 	try {
@@ -63,7 +101,7 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 			env: { ...process.env, CLAUDECODE: undefined }
 		});
 	} catch (err) {
-		try { unlinkSync(mcpConfigPath); } catch {}
+		log.spawn.error({ sessionId: session.id, err }, 'failed to spawn claude');
 		sessionManager.setStatus(session.id, 'error');
 		sessionManager.addEvent(session.id, {
 			type: 'session_status',
@@ -73,8 +111,22 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 		return;
 	}
 
+	log.spawn.info({ sessionId: session.id, pid: child.pid }, 'claude process started');
 	session.process = child;
 	sessionManager.setStatus(session.id, 'running');
+	saveSessionToDb(session);
+
+	if (prompt) {
+		const initialMessage = JSON.stringify({
+			type: 'user',
+			message: { role: 'user', content: prompt }
+		});
+		child.stdin!.write(initialMessage + '\n');
+		log.spawn.info(
+			{ sessionId: session.id, promptLength: prompt.length },
+			'initial prompt sent via stdin'
+		);
+	}
 
 	// Parse stdout as NDJSON
 	const rl = createInterface({ input: child.stdout! });
@@ -82,25 +134,38 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 		try {
 			const event: StreamEvent = JSON.parse(line);
 
+			// Handle permission control requests from Claude via stdio
+			if (event.type === 'control_request') {
+				handleControlRequest(session, event);
+				return;
+			}
+
 			// Capture claude session ID from init event
 			if (event.type === 'system' && (event as { subtype?: string }).subtype === 'init') {
 				session.claudeSessionId = (event as { session_id?: string }).session_id;
+				log.spawn.info(
+					{ sessionId: session.id, claudeSessionId: session.claudeSessionId },
+					'claude session initialized'
+				);
 			}
 
-			// Capture cost from result events
+			// Capture cost from result events and transition to idle
 			if (event.type === 'result') {
 				session.totalCost = (event as { total_cost_usd?: number }).total_cost_usd;
+				sessionManager.setStatus(session.id, 'idle');
+				log.spawn.info({ sessionId: session.id, totalCost: session.totalCost }, 'session result');
 			}
 
 			sessionManager.addEvent(session.id, event);
 		} catch {
-			// Non-JSON line, ignore
+			log.spawn.debug({ sessionId: session.id, line }, 'non-json stdout line');
 		}
 	});
 
 	// Capture stderr for debugging
 	const stderrRl = createInterface({ input: child.stderr! });
 	stderrRl.on('line', (line) => {
+		log.spawn.warn({ sessionId: session.id }, `stderr: ${line}`);
 		sessionManager.addEvent(session.id, {
 			type: 'stderr',
 			content: line
@@ -108,33 +173,156 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 	});
 
 	child.on('exit', (code) => {
-		sessionManager.setStatus(session.id, code === 0 ? 'idle' : 'error');
+		const status = code === 0 ? 'idle' : 'error';
+		log.spawn.info(
+			{ sessionId: session.id, pid: child.pid, exitCode: code, status },
+			'claude process exited'
+		);
+		sessionManager.setStatus(session.id, status);
 		session.process = null;
-
-		// Clean up MCP config
-		try {
-			unlinkSync(mcpConfigPath);
-		} catch {}
+		updateSessionInDb(session, status);
 
 		sessionManager.addEvent(session.id, {
 			type: 'session_status',
-			status: code === 0 ? 'idle' : 'error',
+			status,
 			exitCode: code
 		});
 	});
 }
 
+/** Handle control_request messages from Claude (permission prompts via stdio) */
+function handleControlRequest(session: Session, event: StreamEvent): void {
+	const subtype = (event as { subtype?: string }).subtype;
+
+	if (subtype !== 'can_use_tool') {
+		log.permissions.debug({ sessionId: session.id, subtype }, 'unknown control_request subtype');
+		return;
+	}
+
+	const toolName = (event as { tool_name?: string }).tool_name ?? '';
+	const input = (event as { input?: Record<string, unknown> }).input ?? {};
+	const requestId = (event as { request_id?: string }).request_id;
+
+	log.permissions.info(
+		{ sessionId: session.id, toolName, requestId },
+		'permission request from claude'
+	);
+
+	const mode = session.permissionMode;
+	const READ_ONLY_TOOLS = new Set(['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch']);
+	const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'Glob', 'Grep']);
+
+	// Auto-resolve based on permission mode
+	if (mode === 'plan' && READ_ONLY_TOOLS.has(toolName)) {
+		sendControlResponse(session, requestId, { behavior: 'allow' });
+		return;
+	}
+	if (mode === 'plan') {
+		sendControlResponse(session, requestId, { behavior: 'deny', message: 'Plan mode — read only' });
+		return;
+	}
+	if (mode === 'auto') {
+		sendControlResponse(session, requestId, { behavior: 'allow' });
+		return;
+	}
+	if (mode === 'auto-edit' && FILE_TOOLS.has(toolName)) {
+		sendControlResponse(session, requestId, { behavior: 'allow' });
+		return;
+	}
+
+	// Ask mode (or auto-edit for non-file tools): push to browser and wait
+	log.permissions.info(
+		{ sessionId: session.id, toolName, mode },
+		'waiting for user permission response'
+	);
+
+	const timer = setTimeout(
+		() => {
+			sessionManager.setPendingPermission(session.id, undefined);
+			log.permissions.warn({ sessionId: session.id, toolName }, 'permission request timed out');
+			sendControlResponse(session, requestId, {
+				behavior: 'deny',
+				message: 'Permission request timed out (5 minutes)'
+			});
+		},
+		5 * 60 * 1000
+	);
+
+	sessionManager.setPendingPermission(session.id, {
+		resolve: (r: PermissionResponse) => {
+			clearTimeout(timer);
+			sendControlResponse(session, requestId, r);
+		},
+		toolName,
+		input
+	});
+
+	// Push permission request to connected browser clients
+	sessionManager.addEvent(session.id, {
+		type: 'permission_request',
+		toolName,
+		input,
+		requestId
+	});
+}
+
+/** Send a control_response back to Claude via stdin */
+function sendControlResponse(
+	session: Session,
+	requestId: string | undefined,
+	response: PermissionResponse
+): void {
+	if (!session.process?.stdin?.writable) {
+		log.permissions.warn(
+			{ sessionId: session.id },
+			'cannot send control_response: stdin not writable'
+		);
+		return;
+	}
+
+	const payload = JSON.stringify({
+		type: 'control_response',
+		request_id: requestId,
+		permission_response: {
+			behavior: response.behavior,
+			updatedInput: response.updatedInput,
+			message: response.message
+		}
+	});
+
+	log.permissions.info(
+		{ sessionId: session.id, requestId, behavior: response.behavior },
+		'sending control_response'
+	);
+
+	session.process.stdin.write(payload + '\n');
+}
+
 export function sendMessage(session: Session, message: string): void {
-	if (!session.process?.stdin?.writable) return;
+	if (!session.process?.stdin?.writable) {
+		log.spawn.warn({ sessionId: session.id }, 'sendMessage: stdin not writable');
+		return;
+	}
+	log.spawn.info(
+		{ sessionId: session.id, messageLength: message.length },
+		'sending message to claude'
+	);
 	const payload = JSON.stringify({
 		type: 'user',
 		message: { role: 'user', content: message }
 	});
 	session.process.stdin.write(payload + '\n');
+	sessionManager.setStatus(session.id, 'running');
 }
 
 export function stopSession(session: Session): void {
 	if (session.process) {
+		log.spawn.info(
+			{ sessionId: session.id, pid: session.process.pid },
+			'stopping session (SIGINT)'
+		);
 		session.process.kill('SIGINT');
+	} else {
+		log.spawn.warn({ sessionId: session.id }, 'stopSession: no process to stop');
 	}
 }

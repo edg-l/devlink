@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sessionManager, type PermissionMode } from '$lib/server/session-manager';
+import { log } from '$lib/server/logger';
 
 export const POST: RequestHandler = async (event) => {
 	if (!event.locals.user) {
@@ -20,6 +21,7 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Invalid permission mode' }, { status: 400 });
 	}
 
+	log.sessions.info({ sessionId: id, mode }, 'permission mode change requested');
 	sessionManager.setPermissionMode(id, mode);
 
 	return json({ ok: true });

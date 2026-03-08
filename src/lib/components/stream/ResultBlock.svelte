@@ -34,7 +34,9 @@
 >
 	<div class="flex flex-wrap items-center gap-x-4 gap-y-1">
 		<!-- Status indicator -->
-		<span class="flex items-center gap-1.5 font-medium {success ? 'text-green-400' : 'text-red-400'}">
+		<span
+			class="flex items-center gap-1.5 font-medium {success ? 'text-green-400' : 'text-red-400'}"
+		>
 			<span>{success ? '✓' : '✗'}</span>
 			<span>{success ? 'Done' : 'Error'}</span>
 		</span>
@@ -64,12 +66,12 @@
 
 		<!-- Stop reason -->
 		{#if stopReason && stopReason !== 'end_turn'}
-			<span class="text-zinc-500 text-xs">stop: {stopReason}</span>
+			<span class="text-xs text-zinc-500">stop: {stopReason}</span>
 		{/if}
 	</div>
 
 	<!-- Error text if present -->
 	{#if !success && resultText}
-		<p class="mt-2 text-red-300 text-xs">{resultText}</p>
+		<p class="mt-2 text-xs text-red-300">{resultText}</p>
 	{/if}
 </div>

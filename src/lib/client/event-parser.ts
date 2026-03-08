@@ -7,7 +7,8 @@ export type BlockType =
 	| 'result'
 	| 'rate-limit'
 	| 'error'
-	| 'session-init';
+	| 'session-init'
+	| 'user-message';
 
 export interface BaseBlock {
 	id: string;
@@ -68,6 +69,11 @@ export interface SessionInitBlock extends BaseBlock {
 	tools: string[];
 }
 
+export interface UserMessageBlock extends BaseBlock {
+	type: 'user-message';
+	content: string;
+}
+
 export type Block =
 	| MarkdownBlock
 	| ToolUseBlock
@@ -75,7 +81,8 @@ export type Block =
 	| ResultBlock
 	| RateLimitBlock
 	| ErrorBlock
-	| SessionInitBlock;
+	| SessionInitBlock
+	| UserMessageBlock;
 
 // Raw stream-json event (loosely typed since it comes from Claude)
 export interface StreamEvent {
@@ -111,7 +118,7 @@ export function parseEvent(event: StreamEvent): Block[] {
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					cwd: (event as any).cwd ?? '',
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					tools: (event as any).tools ?? [],
+					tools: (event as any).tools ?? []
 				});
 			}
 			break;
@@ -128,7 +135,7 @@ export function parseEvent(event: StreamEvent): Block[] {
 						id: nextId(),
 						type: 'markdown',
 						timestamp: now,
-						content: block.text,
+						content: block.text
 					});
 				} else if (block.type === 'tool_use') {
 					blocks.push({
@@ -137,14 +144,14 @@ export function parseEvent(event: StreamEvent): Block[] {
 						timestamp: now,
 						toolName: block.name,
 						toolUseId: block.id,
-						input: block.input || {},
+						input: block.input || {}
 					});
 				} else if (block.type === 'thinking') {
 					blocks.push({
 						id: nextId(),
 						type: 'thinking',
 						timestamp: now,
-						content: block.thinking || '',
+						content: block.thinking || ''
 					});
 				}
 			}
@@ -167,9 +174,8 @@ export function parseEvent(event: StreamEvent): Block[] {
 						toolName: '', // Filled by mergeToolResults
 						toolUseId: item.tool_use_id || '',
 						input: {},
-						result:
-							typeof item.content === 'string' ? item.content : JSON.stringify(item.content),
-						isError: item.is_error || false,
+						result: typeof item.content === 'string' ? item.content : JSON.stringify(item.content),
+						isError: item.is_error || false
 					} as ToolUseBlock);
 				}
 			}
@@ -191,9 +197,9 @@ export function parseEvent(event: StreamEvent): Block[] {
 					inputTokens: e.usage?.input_tokens || 0,
 					outputTokens: e.usage?.output_tokens || 0,
 					cacheReadTokens: e.usage?.cache_read_input_tokens || 0,
-					cacheCreationTokens: e.usage?.cache_creation_input_tokens || 0,
+					cacheCreationTokens: e.usage?.cache_creation_input_tokens || 0
 				},
-				stopReason: e.stop_reason || '',
+				stopReason: e.stop_reason || ''
 			});
 			break;
 		}
@@ -206,7 +212,18 @@ export function parseEvent(event: StreamEvent): Block[] {
 				type: 'rate-limit',
 				timestamp: now,
 				status: info?.status || '',
-				resetsAt: info?.resetsAt || 0,
+				resetsAt: info?.resetsAt || 0
+			});
+			break;
+		}
+
+		case 'user_text': {
+			blocks.push({
+				id: nextId(),
+				type: 'user-message',
+				timestamp: now,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				content: (event as any).content || ''
 			});
 			break;
 		}
@@ -218,7 +235,7 @@ export function parseEvent(event: StreamEvent): Block[] {
 					type: 'error',
 					timestamp: now,
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					message: (event as any).content || '',
+					message: (event as any).content || ''
 				});
 			}
 			break;

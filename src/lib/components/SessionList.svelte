@@ -13,13 +13,14 @@
 
 	interface HistoricalSession {
 		sessionId: string;
-		firstPrompt: string;
-		summary: string;
-		messageCount: number;
-		created: string;
-		modified: string;
-		gitBranch: string;
+		claudeSessionId?: string;
 		projectPath: string;
+		model?: string;
+		status: string;
+		totalCost?: number | null;
+		createdAt: string;
+		endedAt: string;
+		summary: string;
 	}
 
 	let {
@@ -74,66 +75,141 @@
 	function projectName(path: string): string {
 		return path.split('/').filter(Boolean).pop() ?? path;
 	}
+
+	interface ProjectGroup {
+		projectPath: string;
+		activeSessions: ActiveSession[];
+		historicalSessions: HistoricalSession[];
+		hasActive: boolean;
+	}
+
+	let groups = $derived.by(() => {
+		const map = new Map<string, ProjectGroup>();
+
+		for (const s of activeSessions) {
+			const key = s.projectPath;
+			if (!map.has(key)) {
+				map.set(key, {
+					projectPath: key,
+					activeSessions: [],
+					historicalSessions: [],
+					hasActive: false
+				});
+			}
+			const g = map.get(key)!;
+			g.activeSessions.push(s);
+			g.hasActive = true;
+		}
+
+		for (const s of historicalSessions) {
+			const key = s.projectPath;
+			if (!map.has(key)) {
+				map.set(key, {
+					projectPath: key,
+					activeSessions: [],
+					historicalSessions: [],
+					hasActive: false
+				});
+			}
+			map.get(key)!.historicalSessions.push(s);
+		}
+
+		return [...map.values()].sort((a, b) => {
+			if (a.hasActive !== b.hasActive) return a.hasActive ? -1 : 1;
+			return a.projectPath.localeCompare(b.projectPath);
+		});
+	});
+
+	// Track open/closed state per project; active projects open by default
+	let openProjects = $state<Set<string>>(new Set());
+
+	$effect(() => {
+		const toOpen = new Set<string>();
+		for (const g of groups) {
+			if (g.hasActive) toOpen.add(g.projectPath);
+		}
+		openProjects = toOpen;
+	});
+
+	function toggleProject(path: string) {
+		const next = new Set(openProjects);
+		if (next.has(path)) {
+			next.delete(path);
+		} else {
+			next.add(path);
+		}
+		openProjects = next;
+	}
 </script>
 
 <div class="flex flex-col">
-	<!-- Active Sessions -->
-	{#if activeSessions.length > 0}
-		<div class="px-3 pt-3 pb-1">
-			<p class="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Active</p>
-		</div>
-		{#each activeSessions as session (session.id)}
-			<button
-				class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
-				onclick={() => onselect?.(session.id)}
-			>
-				<span class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {statusDotClass(session.status)}"
-				></span>
-				<span class="min-w-0 flex-1">
-					<span class="block truncate text-sm text-zinc-200">
-						{projectName(session.projectPath)}
-					</span>
-					<span class="flex gap-2 text-xs text-zinc-500">
-						<span>{elapsed(session.lastActivity)}</span>
-						{#if session.totalCost}
-							<span>{formatCost(session.totalCost)}</span>
-						{/if}
-						{#if session.model}
-							<span class="truncate">{session.model.split('-')[0]}</span>
-						{/if}
-					</span>
-				</span>
-			</button>
-		{/each}
-	{/if}
-
-	<!-- Historical Sessions -->
-	{#if historicalSessions.length > 0}
-		<div class="px-3 pt-3 pb-1">
-			<p class="text-xs font-semibold tracking-wider text-zinc-500 uppercase">History</p>
-		</div>
-		{#each historicalSessions as session (session.sessionId)}
-			<button
-				class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
-				onclick={() => onselect?.(session.sessionId)}
-			>
-				<span class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-zinc-600"></span>
-				<span class="min-w-0 flex-1">
-					<span class="block truncate text-sm text-zinc-300">
-						{session.summary || session.firstPrompt || 'Session'}
-					</span>
-					<span class="flex gap-2 text-xs text-zinc-500">
-						<span>{formatDate(session.modified)}</span>
-						{#if session.gitBranch}
-							<span class="truncate">{session.gitBranch}</span>
-						{/if}
-					</span>
-				</span>
-			</button>
-		{/each}
-	{/if}
-
-	{#if activeSessions.length === 0 && historicalSessions.length === 0}
+	{#if groups.length === 0}
 		<p class="px-3 py-4 text-xs text-zinc-600">No sessions yet</p>
+	{:else}
+		{#each groups as group (group.projectPath)}
+			{@const isOpen = openProjects.has(group.projectPath)}
+			{@const total = group.activeSessions.length + group.historicalSessions.length}
+			<button
+				class="flex w-full items-center gap-2 px-3 pt-3 pb-1 text-left"
+				onclick={() => toggleProject(group.projectPath)}
+			>
+				<span class="text-xs text-zinc-500 transition-transform {isOpen ? 'rotate-90' : ''}"
+					>&#9656;</span
+				>
+				<p class="truncate text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+					{projectName(group.projectPath)}
+					<span class="font-normal">({total})</span>
+				</p>
+			</button>
+
+			{#if isOpen}
+				{#each group.activeSessions as session (session.id)}
+					<button
+						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
+						onclick={() => onselect?.(session.id)}
+					>
+						<span class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {statusDotClass(session.status)}"
+						></span>
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm text-zinc-200">
+								{elapsed(session.lastActivity)}
+								{#if session.totalCost}
+									{formatCost(session.totalCost)}
+								{/if}
+								{#if session.model}
+									{session.model.split('-')[0]}
+								{/if}
+							</span>
+							<span class="block truncate text-xs text-zinc-500">{session.status}</span>
+						</span>
+					</button>
+				{/each}
+
+				{#each group.historicalSessions as session (session.sessionId)}
+					<button
+						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
+						onclick={() => onselect?.(session.sessionId)}
+					>
+						<span
+							class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {session.status === 'error' ? 'bg-red-400' : 'bg-zinc-600'}"
+						></span>
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm text-zinc-300">
+								{session.summary || 'Session'}
+							</span>
+							<span class="flex gap-2 text-xs text-zinc-500">
+								<span>{formatDate(session.createdAt)}</span>
+								{#if session.totalCost}
+									<span>{formatCost(session.totalCost)}</span>
+								{/if}
+								{#if session.model}
+									<span class="truncate">{session.model.split('-')[0]}</span>
+								{/if}
+							</span>
+						</span>
+					</button>
+				{/each}
+			{/if}
+		{/each}
 	{/if}
 </div>

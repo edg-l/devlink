@@ -21,7 +21,7 @@
 
 	{#if expanded}
 		<div class="border-t border-zinc-700 px-3 py-3">
-			<p class="whitespace-pre-wrap text-sm text-zinc-400 italic">{content}</p>
+			<p class="text-sm whitespace-pre-wrap text-zinc-400 italic">{content}</p>
 		</div>
 	{/if}
 </div>

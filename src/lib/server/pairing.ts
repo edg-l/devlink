@@ -1,3 +1,5 @@
+import { log } from './logger';
+
 interface PairingCode {
 	code: string;
 	expiresAt: Date;
@@ -18,12 +20,17 @@ export function generatePairingCode(): string {
 		expiresAt: new Date(Date.now() + 5 * 60 * 1000),
 		used: false
 	});
+	log.pairing.info('pairing code generated');
 	return code;
 }
 
 export function validatePairingCode(code: string): boolean {
 	const data = activeCodes.get(code);
-	if (!data || data.used || data.expiresAt < new Date()) return false;
+	if (!data || data.used || data.expiresAt < new Date()) {
+		log.pairing.warn({ expired: !!data?.used, notFound: !data }, 'pairing code validation failed');
+		return false;
+	}
 	data.used = true;
+	log.pairing.info('pairing code validated');
 	return true;
 }

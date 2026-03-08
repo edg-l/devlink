@@ -25,13 +25,14 @@
 
 	interface HistoricalSession {
 		sessionId: string;
-		firstPrompt: string;
-		summary: string;
-		messageCount: number;
-		created: string;
-		modified: string;
-		gitBranch: string;
+		claudeSessionId?: string;
 		projectPath: string;
+		model?: string;
+		status: string;
+		totalCost?: number | null;
+		createdAt: string;
+		endedAt: string;
+		summary: string;
 	}
 
 	interface Project {
@@ -47,7 +48,11 @@
 				fetch('/api/sessions/history')
 			]);
 			if (activeRes.ok) activeSessions = await activeRes.json();
-			if (historyRes.ok) historicalSessions = await historyRes.json();
+			if (historyRes.ok) {
+				const all: HistoricalSession[] = await historyRes.json();
+				const activeIds = new Set(activeSessions.map((s) => s.id));
+				historicalSessions = all.filter((s) => !activeIds.has(s.sessionId));
+			}
 		} catch {
 			// Silently ignore fetch errors
 		}
@@ -86,10 +91,12 @@
 		class="hidden w-72 flex-shrink-0 flex-col overflow-y-auto border-r border-zinc-800 bg-zinc-900 lg:flex"
 	>
 		<div class="border-b border-zinc-800 p-4">
-			<h1 class="text-lg font-bold tracking-tight">DEVLINK</h1>
+			<a href="/" class="text-lg font-bold tracking-tight hover:text-white">DEVLINK</a>
 		</div>
-		<div class="flex flex-1 flex-col overflow-y-auto">
-			<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
+		<div class="flex min-h-0 flex-1 flex-col">
+			<div class="flex-1 overflow-y-auto">
+				<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
+			</div>
 			<div class="border-t border-zinc-800 p-2">
 				<ProjectPicker {projects} onchange={handleProjectsChange} />
 			</div>
@@ -108,15 +115,17 @@
 			></button>
 			<aside class="relative z-50 flex h-full w-72 flex-col overflow-y-auto bg-zinc-900">
 				<div class="flex items-center justify-between border-b border-zinc-800 p-4">
-					<h1 class="text-lg font-bold tracking-tight">DEVLINK</h1>
+					<a href="/" class="text-lg font-bold tracking-tight hover:text-white">DEVLINK</a>
 					<button
 						onclick={() => (sidebarOpen = false)}
 						class="text-zinc-400 hover:text-zinc-200"
 						aria-label="Close">✕</button
 					>
 				</div>
-				<div class="flex flex-1 flex-col overflow-y-auto">
-					<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
+				<div class="flex min-h-0 flex-1 flex-col">
+					<div class="flex-1 overflow-y-auto">
+						<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
+					</div>
 					<div class="border-t border-zinc-800 p-2">
 						<ProjectPicker {projects} onchange={handleProjectsChange} />
 					</div>

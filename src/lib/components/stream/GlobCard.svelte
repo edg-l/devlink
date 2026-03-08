@@ -14,7 +14,7 @@
 </script>
 
 <ToolCard toolName="Glob" {input} {result}>
-	<div class="px-3 py-2 space-y-2">
+	<div class="space-y-2 px-3 py-2">
 		<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
 			<span class="text-zinc-400">
 				<span class="text-zinc-500">pattern:</span>
@@ -29,9 +29,9 @@
 		</div>
 
 		{#if files.length > 0}
-			<div class="overflow-y-auto max-h-48 rounded bg-zinc-900 p-3 space-y-0.5">
+			<div class="max-h-48 space-y-0.5 overflow-y-auto rounded bg-zinc-900 p-3">
 				{#each files as file (file)}
-					<p class="text-xs font-mono text-zinc-200">{file}</p>
+					<p class="font-mono text-xs text-zinc-200">{file}</p>
 				{/each}
 			</div>
 			<p class="text-xs text-zinc-500">{files.length} file{files.length !== 1 ? 's' : ''}</p>

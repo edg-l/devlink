@@ -35,17 +35,19 @@
 	let emoji = $derived(toolEmoji[toolName] ?? '🔧');
 
 	// Derive a short summary line from input based on tool type
-	let summary = $derived((() => {
-		if (toolName === 'Bash') {
-			const cmd = input.command as string | undefined;
-			return cmd ? cmd.slice(0, 80) + (cmd.length > 80 ? '…' : '') : '';
-		}
-		const path =
-			(input.file_path as string | undefined) ??
-			(input.path as string | undefined) ??
-			(input.pattern as string | undefined);
-		return path ? path.slice(0, 80) + (path.length > 80 ? '…' : '') : '';
-	})());
+	let summary = $derived(
+		(() => {
+			if (toolName === 'Bash') {
+				const cmd = input.command as string | undefined;
+				return cmd ? cmd.slice(0, 80) + (cmd.length > 80 ? '…' : '') : '';
+			}
+			const path =
+				(input.file_path as string | undefined) ??
+				(input.path as string | undefined) ??
+				(input.pattern as string | undefined);
+			return path ? path.slice(0, 80) + (path.length > 80 ? '…' : '') : '';
+		})()
+	);
 </script>
 
 <div
@@ -74,7 +76,11 @@
 			{/if}
 
 			{#if result && !children}
-				<div class="mt-2 {isError ? 'text-red-400 bg-red-950/30' : 'text-zinc-300 bg-zinc-800/50'} rounded p-2 text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto">
+				<div
+					class="mt-2 {isError
+						? 'bg-red-950/30 text-red-400'
+						: 'bg-zinc-800/50 text-zinc-300'} max-h-48 overflow-x-auto overflow-y-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
+				>
 					{result}
 				</div>
 			{/if}
