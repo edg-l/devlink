@@ -7,14 +7,21 @@ export function sseResponse(
 	const stream = new ReadableStream({
 		start(controller) {
 			const encoder = new TextEncoder();
+			let closed = false;
 			const send = (eventType: string, data: unknown) => {
-				controller.enqueue(
-					encoder.encode(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`)
-				);
+				if (closed) return;
+				try {
+					controller.enqueue(
+						encoder.encode(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`)
+					);
+				} catch {
+					closed = true;
+				}
 			};
 			Promise.resolve(generator(send))
 				.catch(() => {})
 				.finally(() => {
+					closed = true;
 					try {
 						controller.close();
 					} catch {}

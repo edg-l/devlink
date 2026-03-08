@@ -8,22 +8,65 @@
 	let {
 		blocks,
 		sessionId,
-		pendingPermission
+		pendingPermission,
+		status = 'idle'
 	}: {
 		blocks: Block[];
 		sessionId: string;
 		pendingPermission?: { toolName: string; input: Record<string, unknown> } | null;
+		status?: string;
 	} = $props();
 
-	let container: HTMLDivElement | undefined = $state();
+	// Show processing indicator when running and last block is a user message (waiting for response)
+	let showProcessing = $derived.by(() => {
+		if (status !== 'running' && status !== 'starting') return false;
+		if (blocks.length === 0) return status === 'running' || status === 'starting';
+		const last = blocks[blocks.length - 1];
+		return last.type === 'user-message' || last.type === 'session-init';
+	});
 
-	// Auto-scroll to bottom when new blocks arrive
+	let container: HTMLDivElement | undefined = $state();
+	let userScrolledUp = $state(false);
+
+	function isNearBottom(el: Element, threshold = 80): boolean {
+		return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+	}
+
+	function handleScroll() {
+		const scrollParent = container?.parentElement;
+		if (scrollParent) {
+			userScrolledUp = !isNearBottom(scrollParent);
+		}
+	}
+
+	// Attach scroll listener to the scroll parent
+	$effect(() => {
+		const scrollParent = container?.parentElement;
+		if (!scrollParent) return;
+		scrollParent.addEventListener('scroll', handleScroll);
+		return () => scrollParent.removeEventListener('scroll', handleScroll);
+	});
+
+	// Auto-scroll to bottom when new blocks arrive or processing starts (unless user scrolled up)
 	$effect(() => {
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		blocks.length;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		showProcessing;
 		const scrollParent = container?.parentElement;
-		if (scrollParent) {
+		if (scrollParent && !userScrolledUp) {
 			scrollParent.scrollTop = scrollParent.scrollHeight;
+		}
+	});
+
+	// Always scroll to bottom when permission prompt appears (user needs to see it)
+	$effect(() => {
+		if (pendingPermission) {
+			const scrollParent = container?.parentElement;
+			if (scrollParent) {
+				userScrolledUp = false;
+				scrollParent.scrollTop = scrollParent.scrollHeight;
+			}
 		}
 	});
 </script>
@@ -40,6 +83,7 @@
 				input={block.input}
 				result={block.result}
 				isError={block.isError}
+				agentChildren={block.children}
 			/>
 		{:else if block.type === 'result'}
 			<!-- no visual output -->
@@ -64,6 +108,18 @@
 		{/if}
 	{/each}
 
+	<!-- Processing indicator -->
+	{#if showProcessing}
+		<div class="flex items-center gap-2 py-2 text-sm text-fg-muted">
+			<span class="flex items-center gap-1">
+				<span class="thinking-dot" style="animation-delay: 0ms"></span>
+				<span class="thinking-dot" style="animation-delay: 200ms"></span>
+				<span class="thinking-dot" style="animation-delay: 400ms"></span>
+			</span>
+			<span>Thinking…</span>
+		</div>
+	{/if}
+
 	<!-- Inline permission prompt if pending -->
 	{#if pendingPermission}
 		<PermissionPrompt
@@ -73,3 +129,27 @@
 		/>
 	{/if}
 </div>
+
+<style>
+	.thinking-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-fg-faint, #666);
+		animation: pulse 1.4s ease-in-out infinite;
+		opacity: 0.3;
+	}
+
+	@keyframes pulse {
+		0%,
+		80%,
+		100% {
+			opacity: 0.3;
+			transform: scale(0.8);
+		}
+		40% {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+</style>

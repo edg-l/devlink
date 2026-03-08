@@ -9,11 +9,13 @@ const EVENT_TYPES = [
 	'system',
 	'assistant',
 	'user',
+	'user_text',
 	'result',
 	'rate_limit_event',
 	'permission_request',
 	'session_status',
-	'error'
+	'error',
+	'stderr'
 ];
 
 export function connectSSE(url: string, handler: SSEHandler): { close: () => void } {

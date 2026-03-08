@@ -23,6 +23,15 @@ export const GET: RequestHandler = async (event) => {
 			send(buffered.type, buffered);
 		}
 
+		// If there's a pending permission, re-send it so the UI picks it up
+		if (session.pendingPermission) {
+			send('permission_request', {
+				type: 'permission_request',
+				toolName: session.pendingPermission.toolName,
+				input: session.pendingPermission.input
+			});
+		}
+
 		// Stream new events until client disconnects
 		return new Promise<void>((resolve) => {
 			const onEvent = (ev: { type: string; [key: string]: unknown }) => {

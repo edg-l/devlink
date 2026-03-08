@@ -416,7 +416,7 @@
 
 	<!-- Stream area -->
 	<div class="min-h-0 flex-1 overflow-y-auto">
-		<StreamView {blocks} {sessionId} {pendingPermission} />
+		<StreamView {blocks} {sessionId} {pendingPermission} {status} />
 	</div>
 
 	<!-- Status bar -->

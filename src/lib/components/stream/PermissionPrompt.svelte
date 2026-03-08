@@ -44,15 +44,15 @@
 	}
 </script>
 
-<div class="my-2 rounded-lg border border-yellow-700 bg-yellow-950/30 px-4 py-3 text-sm">
+<div class="my-2 rounded-lg border border-status-warn/40 bg-bg-overlay px-4 py-3 text-sm">
 	<div class="mb-2 flex items-center gap-2">
-		<span class="text-yellow-400">🔐</span>
-		<span class="font-medium text-yellow-300">Permission required</span>
-		<span class="font-mono text-yellow-400">{toolName}</span>
+		<span class="text-status-warn">⚡</span>
+		<span class="font-medium text-status-warn">Permission required</span>
+		<span class="font-mono text-fg-accent">{toolName}</span>
 	</div>
 
 	{#if keyArg}
-		<div class="mb-3 overflow-x-auto rounded bg-bg-surface px-3 py-2">
+		<div class="mb-3 overflow-x-auto rounded border border-border bg-bg-surface px-3 py-2">
 			<p class="mb-0.5 text-xs text-fg-muted">{keyArg.label}</p>
 			<pre class="text-xs break-all whitespace-pre-wrap text-fg">{keyArg.value}</pre>
 		</div>
@@ -69,13 +69,13 @@
 			<button
 				onclick={() => respond('allow')}
 				disabled={loading}
-				class="rounded bg-status-ok px-3 py-1.5 text-xs font-medium text-fg-bright hover:bg-status-ok disabled:opacity-50"
+				class="rounded border border-status-ok/40 bg-status-ok/20 px-3 py-1.5 text-xs font-medium text-status-ok hover:bg-status-ok/30 disabled:opacity-50"
 				>Allow</button
 			>
 			<button
 				onclick={() => respond('deny')}
 				disabled={loading}
-				class="rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+				class="rounded border border-status-error/40 bg-status-error/20 px-3 py-1.5 text-xs font-medium text-status-error hover:bg-status-error/30 disabled:opacity-50"
 				>Deny</button
 			>
 		</div>

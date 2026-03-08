@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+
 	interface ActiveSession {
 		id: string;
 		projectId: string;
@@ -121,15 +123,31 @@
 		});
 	});
 
-	// Track open/closed state per project; active projects open by default
+	// Track open/closed state per project; active projects auto-open but user toggles are preserved
 	let openProjects = $state<Set<string>>(new Set());
+	let seenProjects = new Set<string>();
 
+	// Only auto-open NEW active projects, never reset user's manual toggles
 	$effect(() => {
-		const toOpen = new Set<string>();
-		for (const g of groups) {
-			if (g.hasActive) toOpen.add(g.projectPath);
-		}
-		openProjects = toOpen;
+		// Read groups (reactive dependency)
+		const currentGroups = groups;
+		// Don't track openProjects reads to avoid circular dependency
+		untrack(() => {
+			let changed = false;
+			for (const g of currentGroups) {
+				if (g.hasActive && !seenProjects.has(g.projectPath)) {
+					changed = true;
+				}
+				seenProjects.add(g.projectPath);
+			}
+			if (changed) {
+				const next = new Set(openProjects);
+				for (const g of currentGroups) {
+					if (g.hasActive) next.add(g.projectPath);
+				}
+				openProjects = next;
+			}
+		});
 	});
 
 	function toggleProject(path: string) {

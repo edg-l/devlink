@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { appendFileSync } from 'fs';
 import {
 	sessionManager,
 	type Session,
@@ -10,6 +11,17 @@ import { log } from './logger';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { claudeSession as sessionTable } from './db/schema';
+
+const RAW_LOG_FILE = '/tmp/devlink-claude-raw.log';
+
+function logRaw(sessionId: string, direction: 'IN' | 'OUT', line: string): void {
+	try {
+		const ts = new Date().toISOString();
+		appendFileSync(RAW_LOG_FILE, `[${ts}] [${sessionId.slice(0, 8)}] ${direction}: ${line}\n`);
+	} catch {
+		// Ignore
+	}
+}
 
 function saveSessionToDb(session: Session, summary?: string): void {
 	try {
@@ -143,18 +155,27 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 			type: 'user',
 			message: { role: 'user', content: prompt }
 		});
+		logRaw(session.id, 'OUT', initialMessage);
 		child.stdin!.write(initialMessage + '\n');
 		log.spawn.info(
 			{ sessionId: session.id, promptLength: prompt.length },
 			'initial prompt sent via stdin'
 		);
+
+		// Emit as event so the initial prompt shows in the chat UI
+		sessionManager.addEvent(session.id, {
+			type: 'user_text',
+			content: prompt
+		});
 	}
 
 	// Parse stdout as NDJSON
 	const rl = createInterface({ input: child.stdout! });
 	rl.on('line', (line) => {
+		logRaw(session.id, 'IN', line);
 		try {
 			const event: StreamEvent = JSON.parse(line);
+			log.spawn.debug({ sessionId: session.id, eventType: event.type }, 'claude event');
 
 			// Handle permission control requests from Claude via stdio
 			if (event.type === 'control_request') {
@@ -246,16 +267,21 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 
 /** Handle control_request messages from Claude (permission prompts via stdio) */
 function handleControlRequest(session: Session, event: StreamEvent): void {
-	const subtype = (event as { subtype?: string }).subtype;
+	// control_request format: { type: 'control_request', request_id: '...', request: { subtype: 'can_use_tool', tool_name: '...', input: {...} } }
+	const requestId = (event as { request_id?: string }).request_id;
+	const request = (event as { request?: Record<string, unknown> }).request;
+	const subtype = request?.subtype as string | undefined;
 
 	if (subtype !== 'can_use_tool') {
-		log.permissions.debug({ sessionId: session.id, subtype }, 'unknown control_request subtype');
+		log.permissions.debug(
+			{ sessionId: session.id, subtype, event },
+			'unknown control_request subtype'
+		);
 		return;
 	}
 
-	const toolName = (event as { tool_name?: string }).tool_name ?? '';
-	const input = (event as { input?: Record<string, unknown> }).input ?? {};
-	const requestId = (event as { request_id?: string }).request_id;
+	const toolName = (request!.tool_name as string) ?? '';
+	const input = (request!.input as Record<string, unknown>) ?? {};
 
 	log.permissions.info(
 		{ sessionId: session.id, toolName, requestId },
@@ -268,7 +294,7 @@ function handleControlRequest(session: Session, event: StreamEvent): void {
 
 	// Auto-resolve based on permission mode
 	if (mode === 'plan' && READ_ONLY_TOOLS.has(toolName)) {
-		sendControlResponse(session, requestId, { behavior: 'allow' });
+		sendControlResponse(session, requestId, { behavior: 'allow' }, input);
 		return;
 	}
 	if (mode === 'plan') {
@@ -276,11 +302,11 @@ function handleControlRequest(session: Session, event: StreamEvent): void {
 		return;
 	}
 	if (mode === 'auto') {
-		sendControlResponse(session, requestId, { behavior: 'allow' });
+		sendControlResponse(session, requestId, { behavior: 'allow' }, input);
 		return;
 	}
 	if (mode === 'auto-edit' && FILE_TOOLS.has(toolName)) {
-		sendControlResponse(session, requestId, { behavior: 'allow' });
+		sendControlResponse(session, requestId, { behavior: 'allow' }, input);
 		return;
 	}
 
@@ -305,7 +331,7 @@ function handleControlRequest(session: Session, event: StreamEvent): void {
 	sessionManager.setPendingPermission(session.id, {
 		resolve: (r: PermissionResponse) => {
 			clearTimeout(timer);
-			sendControlResponse(session, requestId, r);
+			sendControlResponse(session, requestId, r, input);
 		},
 		toolName,
 		input
@@ -324,7 +350,8 @@ function handleControlRequest(session: Session, event: StreamEvent): void {
 function sendControlResponse(
 	session: Session,
 	requestId: string | undefined,
-	response: PermissionResponse
+	response: PermissionResponse,
+	originalInput?: Record<string, unknown>
 ): void {
 	if (!session.process?.stdin?.writable) {
 		log.permissions.warn(
@@ -334,13 +361,19 @@ function sendControlResponse(
 		return;
 	}
 
+	// control_response format: { type: 'control_response', response: { subtype: 'success', request_id: '...', response: { behavior: 'allow'|'deny', ... } } }
+	// Zod schema: allow requires updatedInput (record with original tool input), deny requires message (string)
+	const permissionResponse =
+		response.behavior === 'allow'
+			? { behavior: 'allow' as const, updatedInput: response.updatedInput ?? originalInput ?? {} }
+			: { behavior: 'deny' as const, message: response.message ?? 'Denied by user' };
+
 	const payload = JSON.stringify({
 		type: 'control_response',
-		request_id: requestId,
-		permission_response: {
-			behavior: response.behavior,
-			updatedInput: response.updatedInput,
-			message: response.message
+		response: {
+			subtype: 'success',
+			request_id: requestId,
+			response: permissionResponse
 		}
 	});
 
@@ -349,6 +382,7 @@ function sendControlResponse(
 		'sending control_response'
 	);
 
+	logRaw(session.id, 'OUT', payload);
 	session.process.stdin.write(payload + '\n');
 }
 

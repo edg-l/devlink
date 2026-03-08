@@ -28,6 +28,7 @@ export interface ToolUseBlock extends BaseBlock {
 	input: Record<string, unknown>;
 	result?: string;
 	isError?: boolean;
+	children?: Block[]; // Sub-blocks for Agent tool calls
 }
 
 export interface ThinkingBlock extends BaseBlock {
@@ -247,27 +248,82 @@ export function parseEvent(event: StreamEvent): Block[] {
 
 /**
  * Merge tool results into their parent tool-use blocks.
+ * Also nests sub-agent blocks under their parent Agent tool-use blocks.
  * Call this on the full block array to associate results with their tool calls.
  */
 export function mergeToolResults(blocks: Block[]): Block[] {
 	const toolUseMap = new Map<string, number>(); // map toolUseId -> index in result
 	const result: Block[] = [];
 
+	// Track active Agent tool-use IDs (stack for nested agents)
+	const agentStack: string[] = [];
+
 	for (const block of blocks) {
 		if (block.type === 'tool-use') {
 			const existingIdx = toolUseMap.get(block.toolUseId);
 			if (existingIdx !== undefined && block.result !== undefined) {
-				// This is a result for an existing tool-use — create updated copy
-				const existing = result[existingIdx] as ToolUseBlock;
-				result[existingIdx] = { ...existing, result: block.result, isError: block.isError };
+				// This is a result for an existing tool-use — merge result
+				const existing = findBlock(result, block.toolUseId) as ToolUseBlock | undefined;
+				if (existing) {
+					existing.result = block.result;
+					existing.isError = block.isError;
+				}
+				// If this was an Agent, pop it from the stack
+				if (agentStack[agentStack.length - 1] === block.toolUseId) {
+					agentStack.pop();
+				}
 			} else {
+				// New tool-use block
+				if (agentStack.length > 0) {
+					// We're inside an agent — add as child of the current agent
+					const parentId = agentStack[agentStack.length - 1];
+					const parent = findBlock(result, parentId) as ToolUseBlock | undefined;
+					if (parent) {
+						if (!parent.children) parent.children = [];
+						toolUseMap.set(block.toolUseId, result.length); // track for result merging
+						parent.children.push(block);
+						// If this is a nested Agent, push onto stack
+						if (block.toolName === 'Agent') {
+							agentStack.push(block.toolUseId);
+						}
+						continue;
+					}
+				}
 				toolUseMap.set(block.toolUseId, result.length);
 				result.push(block);
+				// If this is an Agent tool, push onto stack
+				if (block.toolName === 'Agent') {
+					agentStack.push(block.toolUseId);
+				}
 			}
+		} else if (agentStack.length > 0) {
+			// Inside an agent context — nest under agent (skip thinking/markdown that are agent-internal)
+			const parentId = agentStack[agentStack.length - 1];
+			const parent = findBlock(result, parentId) as ToolUseBlock | undefined;
+			if (parent) {
+				if (!parent.children) parent.children = [];
+				parent.children.push(block);
+				continue;
+			}
+			result.push(block);
 		} else {
 			result.push(block);
 		}
 	}
 
 	return result;
+}
+
+/** Recursively find a tool-use block by toolUseId in result array (including agent children) */
+function findBlock(blocks: Block[], toolUseId: string): ToolUseBlock | undefined {
+	for (const b of blocks) {
+		if (b.type === 'tool-use') {
+			if (b.toolUseId === toolUseId) return b;
+			if (b.children) {
+				const found = findBlock(b.children, toolUseId);
+				if (found) return found;
+			}
+		}
+	}
+	return undefined;
 }

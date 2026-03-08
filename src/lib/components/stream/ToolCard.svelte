@@ -1,23 +1,29 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
+	import type { Block } from '$lib/client/event-parser';
+	import MarkdownBlock from './MarkdownBlock.svelte';
+	import ThinkingBlock from './ThinkingBlock.svelte';
+	import Self from './ToolCard.svelte';
 
 	let {
 		toolName,
 		input,
 		result,
 		isError = false,
-		children
+		children,
+		agentChildren
 	}: {
 		toolName: string;
 		input: Record<string, unknown>;
 		result?: string;
 		isError?: boolean;
 		children?: Snippet;
+		agentChildren?: Block[];
 	} = $props();
 
 	// Tools that default to expanded because they make important changes
-	const expandedByDefault = new Set(['Edit', 'Write', 'Bash']);
+	const expandedByDefault = new Set(['Edit', 'Write', 'Bash', 'Agent']);
 
 	let expanded = $state(untrack(() => expandedByDefault.has(toolName)));
 
@@ -37,6 +43,10 @@
 	// Derive a short summary line from input based on tool type
 	let summary = $derived(
 		(() => {
+			if (toolName === 'Agent') {
+				const desc = input.description as string | undefined;
+				return desc ? desc.slice(0, 80) + (desc.length > 80 ? '…' : '') : '';
+			}
 			if (toolName === 'Bash') {
 				const cmd = input.command as string | undefined;
 				return cmd ? cmd.slice(0, 80) + (cmd.length > 80 ? '…' : '') : '';
@@ -75,7 +85,33 @@
 				{@render children()}
 			{/if}
 
-			{#if result && !children}
+			{#if agentChildren?.length}
+				<div class="flex flex-col gap-1 px-2 py-2">
+					{#each agentChildren as child (child.id)}
+						{#if child.type === 'markdown'}
+							<MarkdownBlock content={child.content} />
+						{:else if child.type === 'thinking'}
+							<ThinkingBlock content={child.content} />
+						{:else if child.type === 'tool-use'}
+							<Self
+								toolName={child.toolName}
+								input={child.input}
+								result={child.result}
+								isError={child.isError}
+								agentChildren={child.children}
+							/>
+						{:else if child.type === 'error'}
+							<div
+								class="rounded border border-status-error bg-red-950/30 px-3 py-2 text-xs text-status-error"
+							>
+								{child.message}
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/if}
+
+			{#if result && !children && !agentChildren?.length}
 				<div
 					class="mt-2 {isError
 						? 'bg-red-950/30 text-status-error'
