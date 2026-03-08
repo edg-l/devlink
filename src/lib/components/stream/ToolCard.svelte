@@ -52,25 +52,25 @@
 
 <div
 	class="my-2 rounded-lg border text-sm {isError
-		? 'border-red-700 bg-red-950/30'
-		: 'border-zinc-700 bg-zinc-800/50'}"
+		? 'border-status-error bg-red-950/30'
+		: 'border-border bg-bg-overlay/50'}"
 >
 	<!-- Header / toggle -->
 	<button
-		class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-700/30"
+		class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-active/30"
 		onclick={() => (expanded = !expanded)}
 		type="button"
 	>
 		<span>{emoji}</span>
-		<span class="font-mono font-medium text-zinc-200">{toolName}</span>
+		<span class="font-mono font-medium text-fg">{toolName}</span>
 		{#if summary}
-			<span class="truncate text-zinc-500">{summary}</span>
+			<span class="truncate text-fg-muted">{summary}</span>
 		{/if}
-		<span class="ml-auto text-xs text-zinc-500">{expanded ? '▼' : '▶'}</span>
+		<span class="ml-auto text-xs text-fg-muted">{expanded ? '▼' : '▶'}</span>
 	</button>
 
 	{#if expanded}
-		<div class="border-t border-zinc-700">
+		<div class="border-t border-border">
 			{#if children}
 				{@render children()}
 			{/if}
@@ -78,8 +78,8 @@
 			{#if result && !children}
 				<div
 					class="mt-2 {isError
-						? 'bg-red-950/30 text-red-400'
-						: 'bg-zinc-800/50 text-zinc-300'} max-h-48 overflow-x-auto overflow-y-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
+						? 'bg-red-950/30 text-status-error'
+						: 'bg-bg-overlay/50 text-fg'} max-h-48 overflow-x-auto overflow-y-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
 				>
 					{result}
 				</div>

@@ -14,29 +14,33 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Devices | Devlink</title>
+</svelte:head>
+
 <div class="mx-auto max-w-2xl px-4 py-8">
 	<div class="mb-8">
-		<h1 class="text-2xl font-bold text-gray-900">Paired Devices</h1>
-		<p class="mt-1 text-sm text-gray-500">Manage devices that have been paired with Devlink.</p>
+		<h1 class="text-2xl font-bold text-fg-bright">Paired Devices</h1>
+		<p class="mt-1 text-sm text-fg-muted">Manage devices that have been paired with Devlink.</p>
 	</div>
 
 	{#if data.devices.length === 0}
-		<div class="rounded-xl border border-dashed border-gray-300 p-8 text-center">
-			<p class="text-sm text-gray-500">No paired devices yet.</p>
+		<div class="rounded-xl border border-dashed border-border p-8 text-center">
+			<p class="text-sm text-fg-muted">No paired devices yet.</p>
 			<a
 				href={resolve('/pair')}
-				class="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-500"
+				class="mt-2 inline-block text-sm font-medium text-fg-accent hover:text-fg-accent"
 			>
 				Pair a device
 			</a>
 		</div>
 	{:else}
-		<ul class="divide-y divide-gray-100 rounded-xl ring-1 ring-gray-200">
+		<ul class="divide-y divide-border rounded-xl ring-1 ring-border">
 			{#each data.devices as device (device.id)}
 				<li class="flex items-center justify-between px-4 py-4">
 					<div class="min-w-0">
-						<p class="truncate text-sm font-medium text-gray-900">{device.name}</p>
-						<p class="mt-0.5 text-xs text-gray-500">
+						<p class="truncate text-sm font-medium text-fg-bright">{device.name}</p>
+						<p class="mt-0.5 text-xs text-fg-muted">
 							Paired {formatDate(device.pairedAt)} &middot; Last seen {formatDate(device.lastSeen)}
 						</p>
 					</div>

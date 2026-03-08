@@ -3,7 +3,6 @@
 	import MarkdownBlock from './MarkdownBlock.svelte';
 	import ThinkingBlock from './ThinkingBlock.svelte';
 	import ToolCard from './ToolCard.svelte';
-	import ResultBlock from './ResultBlock.svelte';
 	import PermissionPrompt from './PermissionPrompt.svelte';
 
 	let {
@@ -43,20 +42,22 @@
 				isError={block.isError}
 			/>
 		{:else if block.type === 'result'}
-			{@const _ = block}
+			<!-- no visual output -->
 		{:else if block.type === 'rate-limit'}
-			{@const _ = block}
+			<!-- no visual output -->
 		{:else if block.type === 'user-message'}
-			<div class="ml-auto max-w-[80%] rounded-lg bg-zinc-800 px-3 py-2 text-sm text-zinc-300">
+			<div class="ml-auto max-w-[80%] rounded-lg bg-bg-overlay px-3 py-2 text-sm text-fg">
 				{block.content}
 			</div>
 		{:else if block.type === 'error'}
-			<div class="rounded border border-red-700 bg-red-950/30 px-3 py-2 text-xs text-red-400">
+			<div
+				class="rounded border border-status-error bg-red-950/30 px-3 py-2 text-xs text-status-error"
+			>
 				{block.message}
 			</div>
 		{:else if block.type === 'session-init'}
 			{#if i === 0}
-				<div class="text-xs text-zinc-600">
+				<div class="text-xs text-fg-faint">
 					Session started — model: {block.model}, cwd: {block.cwd}
 				</div>
 			{/if}

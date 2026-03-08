@@ -1,9 +1,11 @@
 <script lang="ts">
 	import SessionList from '$lib/components/SessionList.svelte';
 	import ProjectPicker from '$lib/components/ProjectPicker.svelte';
+	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	let sidebarOpen = $state(false);
 
@@ -69,11 +71,16 @@
 
 	function handleSessionSelect(sessionId: string) {
 		sidebarOpen = false;
-		goto(`/session/${sessionId}`);
+		goto(resolve(`/session/${sessionId}`));
 	}
 
 	function handleProjectsChange(updated: Project[]) {
 		projects = updated;
+	}
+
+	async function signOut() {
+		await fetch('/api/auth/sign-out', { method: 'POST' });
+		goto(resolve('/login'));
 	}
 
 	$effect(() => {
@@ -85,20 +92,30 @@
 	});
 </script>
 
-<div class="flex h-screen bg-zinc-950 text-zinc-100">
+<div class="flex h-screen bg-bg text-fg-bright">
 	<!-- Desktop Sidebar -->
 	<aside
-		class="hidden w-72 flex-shrink-0 flex-col overflow-y-auto border-r border-zinc-800 bg-zinc-900 lg:flex"
+		class="hidden w-72 flex-shrink-0 flex-col overflow-y-auto border-r border-border bg-bg-surface lg:flex"
 	>
-		<div class="border-b border-zinc-800 p-4">
-			<a href="/" class="text-lg font-bold tracking-tight hover:text-white">DEVLINK</a>
+		<div class="border-b border-border p-4">
+			<a href={resolve('/')} class="text-lg font-bold tracking-tight hover:text-fg-bright"
+				>DEVLINK</a
+			>
 		</div>
 		<div class="flex min-h-0 flex-1 flex-col">
 			<div class="flex-1 overflow-y-auto">
 				<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
 			</div>
-			<div class="border-t border-zinc-800 p-2">
+			<div class="border-t border-border p-2">
+				<div class="px-1 py-1">
+					<ThemeSwitcher />
+				</div>
 				<ProjectPicker {projects} onchange={handleProjectsChange} />
+				<div class="px-1 py-1">
+					<button onclick={signOut} class="w-full text-left text-sm text-fg-muted hover:text-fg">
+						Sign Out
+					</button>
+				</div>
 			</div>
 		</div>
 	</aside>
@@ -107,18 +124,20 @@
 	{#if sidebarOpen}
 		<div class="fixed inset-0 z-40 lg:hidden">
 			<button
-				class="absolute inset-0 bg-black/50"
+				class="absolute inset-0 bg-bg/50"
 				onclick={() => (sidebarOpen = false)}
 				onkeydown={(e) => e.key === 'Escape' && (sidebarOpen = false)}
 				aria-label="Close sidebar"
 				type="button"
 			></button>
-			<aside class="relative z-50 flex h-full w-72 flex-col overflow-y-auto bg-zinc-900">
-				<div class="flex items-center justify-between border-b border-zinc-800 p-4">
-					<a href="/" class="text-lg font-bold tracking-tight hover:text-white">DEVLINK</a>
+			<aside class="relative z-50 flex h-full w-72 flex-col overflow-y-auto bg-bg-surface">
+				<div class="flex items-center justify-between border-b border-border p-4">
+					<a href={resolve('/')} class="text-lg font-bold tracking-tight hover:text-fg-bright"
+						>DEVLINK</a
+					>
 					<button
 						onclick={() => (sidebarOpen = false)}
-						class="text-zinc-400 hover:text-zinc-200"
+						class="text-fg-muted hover:text-fg"
 						aria-label="Close">✕</button
 					>
 				</div>
@@ -126,8 +145,19 @@
 					<div class="flex-1 overflow-y-auto">
 						<SessionList {activeSessions} {historicalSessions} onselect={handleSessionSelect} />
 					</div>
-					<div class="border-t border-zinc-800 p-2">
+					<div class="border-t border-border p-2">
+						<div class="px-1 py-1">
+							<ThemeSwitcher />
+						</div>
 						<ProjectPicker {projects} onchange={handleProjectsChange} />
+						<div class="px-1 py-1">
+							<button
+								onclick={signOut}
+								class="w-full text-left text-sm text-fg-muted hover:text-fg"
+							>
+								Sign Out
+							</button>
+						</div>
 					</div>
 				</div>
 			</aside>
@@ -137,10 +167,10 @@
 	<!-- Main content -->
 	<main class="flex flex-1 flex-col overflow-hidden">
 		<!-- Mobile header -->
-		<div class="flex items-center border-b border-zinc-800 bg-zinc-900 p-3 lg:hidden">
+		<div class="flex items-center border-b border-border bg-bg-surface p-3 lg:hidden">
 			<button
 				onclick={() => (sidebarOpen = true)}
-				class="mr-3 text-zinc-400 hover:text-zinc-200"
+				class="mr-3 text-fg-muted hover:text-fg"
 				aria-label="Open sidebar">☰</button
 			>
 			<span class="font-bold">DEVLINK</span>

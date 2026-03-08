@@ -23,6 +23,7 @@ export interface Session {
 	events: StreamEvent[];
 	emitter: EventEmitter;
 	model?: string;
+	summary?: string;
 	createdAt: Date;
 	lastActivity: Date;
 	totalCost?: number;
@@ -100,6 +101,15 @@ class SessionManager {
 		log.sessions.info({ sessionId, from: prev, to: status }, 'status changed');
 		session.emitter.emit('status', status);
 		session.emitter.emit('event', { type: 'session_status', status });
+	}
+
+	setModel(sessionId: string, model: string): void {
+		const session = this.sessions.get(sessionId);
+		if (session) {
+			const prev = session.model;
+			session.model = model;
+			log.sessions.info({ sessionId, from: prev, to: model }, 'model changed');
+		}
 	}
 
 	setPermissionMode(sessionId: string, mode: PermissionMode): void {

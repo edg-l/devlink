@@ -6,6 +6,7 @@
 		status: string;
 		permissionMode: string;
 		model?: string;
+		summary?: string;
 		createdAt: string;
 		lastActivity: string;
 		totalCost?: number;
@@ -37,11 +38,11 @@
 		switch (status) {
 			case 'running':
 			case 'starting':
-				return 'bg-green-400';
+				return 'bg-status-ok';
 			case 'error':
-				return 'bg-red-400';
+				return 'bg-status-error';
 			default:
-				return 'bg-zinc-500';
+				return 'bg-fg-muted';
 		}
 	}
 
@@ -144,7 +145,7 @@
 
 <div class="flex flex-col">
 	{#if groups.length === 0}
-		<p class="px-3 py-4 text-xs text-zinc-600">No sessions yet</p>
+		<p class="px-3 py-4 text-xs text-fg-faint">No sessions yet</p>
 	{:else}
 		{#each groups as group (group.projectPath)}
 			{@const isOpen = openProjects.has(group.projectPath)}
@@ -153,10 +154,10 @@
 				class="flex w-full items-center gap-2 px-3 pt-3 pb-1 text-left"
 				onclick={() => toggleProject(group.projectPath)}
 			>
-				<span class="text-xs text-zinc-500 transition-transform {isOpen ? 'rotate-90' : ''}"
+				<span class="text-xs text-fg-muted transition-transform {isOpen ? 'rotate-90' : ''}"
 					>&#9656;</span
 				>
-				<p class="truncate text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+				<p class="truncate text-xs font-semibold tracking-wider text-fg-muted uppercase">
 					{projectName(group.projectPath)}
 					<span class="font-normal">({total})</span>
 				</p>
@@ -165,39 +166,44 @@
 			{#if isOpen}
 				{#each group.activeSessions as session (session.id)}
 					<button
-						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
+						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-overlay"
 						onclick={() => onselect?.(session.id)}
 					>
 						<span class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {statusDotClass(session.status)}"
 						></span>
 						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm text-zinc-200">
-								{elapsed(session.lastActivity)}
+							<span class="block truncate text-sm text-fg">
+								{session.summary || 'Session'}
+							</span>
+							<span class="flex gap-2 text-xs text-fg-muted">
+								<span>{elapsed(session.lastActivity)}</span>
+								<span>{session.status}</span>
 								{#if session.totalCost}
-									{formatCost(session.totalCost)}
+									<span>{formatCost(session.totalCost)}</span>
 								{/if}
 								{#if session.model}
-									{session.model.split('-')[0]}
+									<span class="truncate">{session.model.split('-')[0]}</span>
 								{/if}
 							</span>
-							<span class="block truncate text-xs text-zinc-500">{session.status}</span>
 						</span>
 					</button>
 				{/each}
 
 				{#each group.historicalSessions as session (session.sessionId)}
 					<button
-						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800"
+						class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-overlay"
 						onclick={() => onselect?.(session.sessionId)}
 					>
 						<span
-							class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {session.status === 'error' ? 'bg-red-400' : 'bg-zinc-600'}"
+							class="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full {session.status === 'error'
+								? 'bg-status-error'
+								: 'bg-fg-faint'}"
 						></span>
 						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm text-zinc-300">
+							<span class="block truncate text-sm text-fg">
 								{session.summary || 'Session'}
 							</span>
-							<span class="flex gap-2 text-xs text-zinc-500">
+							<span class="flex gap-2 text-xs text-fg-muted">
 								<span>{formatDate(session.createdAt)}</span>
 								{#if session.totalCost}
 									<span>{formatCost(session.totalCost)}</span>

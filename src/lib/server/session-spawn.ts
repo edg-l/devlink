@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { claudeSession as sessionTable } from './db/schema';
 
-function saveSessionToDb(session: Session): void {
+function saveSessionToDb(session: Session, summary?: string): void {
 	try {
 		db.insert(sessionTable)
 			.values({
@@ -23,6 +23,7 @@ function saveSessionToDb(session: Session): void {
 				permissionMode: session.permissionMode,
 				status: 'running',
 				totalCost: null,
+				summary: summary || '',
 				createdAt: session.createdAt,
 				endedAt: null
 			})
@@ -31,6 +32,17 @@ function saveSessionToDb(session: Session): void {
 		log.spawn.info({ sessionId: session.id }, 'session saved to db');
 	} catch (err) {
 		log.spawn.error({ sessionId: session.id, err }, 'failed to save session to db');
+	}
+}
+
+function saveEventsToDb(session: Session): void {
+	try {
+		db.update(sessionTable)
+			.set({ events: JSON.stringify(session.events) })
+			.where(eq(sessionTable.id, session.id))
+			.run();
+	} catch (err) {
+		log.spawn.error({ sessionId: session.id, err }, 'failed to persist events');
 	}
 }
 
@@ -114,7 +126,17 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 	log.spawn.info({ sessionId: session.id, pid: child.pid }, 'claude process started');
 	session.process = child;
 	sessionManager.setStatus(session.id, 'running');
-	saveSessionToDb(session);
+	const summary = prompt ? prompt.slice(0, 200) : '';
+	session.summary = summary;
+	saveSessionToDb(session, summary);
+
+	// Periodically persist events to DB so they survive server restarts
+	const eventSaveInterval = setInterval(() => {
+		if (session.events.length > 0) saveEventsToDb(session);
+	}, 10_000);
+
+	// Track whether CLI has initialized (sent the init event)
+	let initialized = false;
 
 	if (prompt) {
 		const initialMessage = JSON.stringify({
@@ -143,17 +165,42 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 			// Capture claude session ID from init event
 			if (event.type === 'system' && (event as { subtype?: string }).subtype === 'init') {
 				session.claudeSessionId = (event as { session_id?: string }).session_id;
+				initialized = true;
 				log.spawn.info(
 					{ sessionId: session.id, claudeSessionId: session.claudeSessionId },
 					'claude session initialized'
 				);
+				// Persist claudeSessionId immediately so it survives server restarts
+				if (session.claudeSessionId) {
+					try {
+						db.update(sessionTable)
+							.set({ claudeSessionId: session.claudeSessionId })
+							.where(eq(sessionTable.id, session.id))
+							.run();
+					} catch (err) {
+						log.spawn.error({ sessionId: session.id, err }, 'failed to persist claudeSessionId');
+					}
+				}
 			}
 
 			// Capture cost from result events and transition to idle
 			if (event.type === 'result') {
-				session.totalCost = (event as { total_cost_usd?: number }).total_cost_usd;
+				const resultEvent = event as {
+					total_cost_usd?: number;
+					is_error?: boolean;
+					error?: string;
+				};
+				session.totalCost = resultEvent.total_cost_usd;
 				sessionManager.setStatus(session.id, 'idle');
-				log.spawn.info({ sessionId: session.id, totalCost: session.totalCost }, 'session result');
+				log.spawn.info(
+					{
+						sessionId: session.id,
+						totalCost: session.totalCost,
+						isError: resultEvent.is_error,
+						error: resultEvent.error
+					},
+					'session result'
+				);
 			}
 
 			sessionManager.addEvent(session.id, event);
@@ -173,20 +220,27 @@ export function spawnSession(session: Session, prompt: string, resumeSessionId?:
 	});
 
 	child.on('exit', (code) => {
+		clearInterval(eventSaveInterval);
 		const status = code === 0 ? 'idle' : 'error';
 		log.spawn.info(
-			{ sessionId: session.id, pid: child.pid, exitCode: code, status },
+			{ sessionId: session.id, pid: child.pid, exitCode: code, status, initialized },
 			'claude process exited'
 		);
 		sessionManager.setStatus(session.id, status);
 		session.process = null;
+		saveEventsToDb(session);
 		updateSessionInDb(session, status);
 
-		sessionManager.addEvent(session.id, {
+		const exitEvent: StreamEvent = {
 			type: 'session_status',
 			status,
 			exitCode: code
-		});
+		};
+		// If CLI exited before init, the resume likely failed
+		if (!initialized && code !== 0) {
+			exitEvent.error = 'Session failed to start (resume may have expired)';
+		}
+		sessionManager.addEvent(session.id, exitEvent);
 	});
 }
 
@@ -325,4 +379,38 @@ export function stopSession(session: Session): void {
 	} else {
 		log.spawn.warn({ sessionId: session.id }, 'stopSession: no process to stop');
 	}
+}
+
+export async function switchModel(session: Session, newModel: string): Promise<void> {
+	const claudeSessionId = session.claudeSessionId;
+	if (!claudeSessionId) {
+		throw new Error('Cannot switch model: no claude session ID (session not initialized yet)');
+	}
+
+	log.spawn.info(
+		{ sessionId: session.id, from: session.model, to: newModel, claudeSessionId },
+		'switching model'
+	);
+
+	// Stop current process and wait for exit
+	if (session.process) {
+		const exitPromise = new Promise<void>((resolve) => {
+			session.process!.once('exit', () => resolve());
+		});
+		session.process.kill('SIGINT');
+		await exitPromise;
+	}
+
+	// Update model
+	session.model = newModel;
+
+	// Update DB
+	try {
+		db.update(sessionTable).set({ model: newModel }).where(eq(sessionTable.id, session.id)).run();
+	} catch (err) {
+		log.spawn.error({ sessionId: session.id, err }, 'failed to update model in db');
+	}
+
+	// Respawn with resume + new model
+	spawnSession(session, '', claudeSessionId);
 }

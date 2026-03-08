@@ -1,3 +1,94 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Ayu Dark (default) */
+.theme-dark {
+	--color-bg: #0d1017;
+	--color-bg-surface: #0f131a;
+	--color-bg-overlay: #131721;
+	--color-bg-input: #131721;
+	--color-bg-active: #1a1f29;
+	--color-fg: #bfbdb6;
+	--color-fg-bright: #e6e1cf;
+	--color-fg-muted: #5a6673;
+	--color-fg-faint: #404953;
+	--color-fg-accent: #e6b450;
+	--color-border: #1a1f29;
+	--color-border-active: #5a6673;
+	--color-status-ok: #aad94c;
+	--color-status-error: #f07178;
+	--color-status-warn: #ffb454;
+	--color-btn-primary-bg: #bfbdb6;
+	--color-btn-primary-fg: #0d1017;
+	--color-btn-secondary-bg: #1a1f29;
+	--color-btn-hover: #e6e1cf;
+}
+
+/* Ayu Mirage */
+.theme-mirage {
+	--color-bg: #1f2430;
+	--color-bg-surface: #232834;
+	--color-bg-overlay: #2a2f3a;
+	--color-bg-input: #2a2f3a;
+	--color-bg-active: #33415e;
+	--color-fg: #cccac2;
+	--color-fg-bright: #f0ede6;
+	--color-fg-muted: #6e7c8f;
+	--color-fg-faint: #4d5566;
+	--color-fg-accent: #ffcc66;
+	--color-border: #2a2f3a;
+	--color-border-active: #6e7c8f;
+	--color-status-ok: #87d96c;
+	--color-status-error: #f28779;
+	--color-status-warn: #ffa659;
+	--color-btn-primary-bg: #cccac2;
+	--color-btn-primary-fg: #1f2430;
+	--color-btn-secondary-bg: #2a2f3a;
+	--color-btn-hover: #f0ede6;
+}
+
+/* Ayu Light */
+.theme-light {
+	--color-bg: #fafafa;
+	--color-bg-surface: #f3f3f3;
+	--color-bg-overlay: #e8e8e8;
+	--color-bg-input: #ffffff;
+	--color-bg-active: #d1e4f4;
+	--color-fg: #575f66;
+	--color-fg-bright: #2b2d2e;
+	--color-fg-muted: #abb0b6;
+	--color-fg-faint: #c5c5c8;
+	--color-fg-accent: #ff9940;
+	--color-border: #e8e8e8;
+	--color-border-active: #abb0b6;
+	--color-status-ok: #86b300;
+	--color-status-error: #e5474f;
+	--color-status-warn: #fa8532;
+	--color-btn-primary-bg: #575f66;
+	--color-btn-primary-fg: #fafafa;
+	--color-btn-secondary-bg: #e8e8e8;
+	--color-btn-hover: #2b2d2e;
+}
+
+@theme {
+	--color-bg: var(--color-bg);
+	--color-bg-surface: var(--color-bg-surface);
+	--color-bg-overlay: var(--color-bg-overlay);
+	--color-bg-input: var(--color-bg-input);
+	--color-bg-active: var(--color-bg-active);
+	--color-fg: var(--color-fg);
+	--color-fg-bright: var(--color-fg-bright);
+	--color-fg-muted: var(--color-fg-muted);
+	--color-fg-faint: var(--color-fg-faint);
+	--color-fg-accent: var(--color-fg-accent);
+	--color-border: var(--color-border);
+	--color-border-active: var(--color-border-active);
+	--color-status-ok: var(--color-status-ok);
+	--color-status-error: var(--color-status-error);
+	--color-status-warn: var(--color-status-warn);
+	--color-btn-primary-bg: var(--color-btn-primary-bg);
+	--color-btn-primary-fg: var(--color-btn-primary-fg);
+	--color-btn-secondary-bg: var(--color-btn-secondary-bg);
+	--color-btn-hover: var(--color-btn-hover);
+}

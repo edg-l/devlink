@@ -49,10 +49,10 @@
 
 <div class="flex flex-col gap-1">
 	<div class="flex items-center justify-between px-1 py-1">
-		<p class="text-xs font-semibold tracking-wider text-zinc-500 uppercase">Projects</p>
+		<p class="text-xs font-semibold tracking-wider text-fg-muted uppercase">Projects</p>
 		<button
 			onclick={() => (showAddForm = !showAddForm)}
-			class="text-xs text-zinc-500 hover:text-zinc-300"
+			class="text-xs text-fg-muted hover:text-fg"
 			title="Add project"
 		>
 			{showAddForm ? '✕' : '＋'}
@@ -60,14 +60,14 @@
 	</div>
 
 	{#each projects as proj (proj.id)}
-		<div class="flex items-center gap-2 rounded px-2 py-1 text-sm text-zinc-400">
+		<div class="flex items-center gap-2 rounded px-2 py-1 text-sm text-fg-muted">
 			<span class="text-xs">📁</span>
 			<span class="truncate">{proj.name}</span>
 		</div>
 	{/each}
 
 	{#if projects.length === 0 && !showAddForm}
-		<p class="px-2 py-1 text-xs text-zinc-600">No projects added</p>
+		<p class="px-2 py-1 text-xs text-fg-faint">No projects added</p>
 	{/if}
 
 	{#if showAddForm}
@@ -76,21 +76,21 @@
 				type="text"
 				bind:value={newPath}
 				placeholder="/absolute/path"
-				class="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+				class="w-full rounded border border-border bg-bg-overlay px-2 py-1 text-xs text-fg placeholder-fg-faint focus:border-border-active focus:outline-none"
 			/>
 			<input
 				type="text"
 				bind:value={newName}
 				placeholder="Name (optional)"
-				class="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+				class="w-full rounded border border-border bg-bg-overlay px-2 py-1 text-xs text-fg placeholder-fg-faint focus:border-border-active focus:outline-none"
 			/>
 			{#if error}
-				<p class="text-xs text-red-400">{error}</p>
+				<p class="text-xs text-status-error">{error}</p>
 			{/if}
 			<button
 				onclick={addProject}
 				disabled={adding || !newPath.trim()}
-				class="rounded bg-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+				class="rounded bg-btn-secondary-bg px-2 py-1 text-xs text-fg hover:bg-bg-active disabled:opacity-50"
 			>
 				{adding ? 'Adding…' : 'Add'}
 			</button>

@@ -5,7 +5,7 @@
 	const renderer = new marked.Renderer();
 	renderer.code = ({ text, lang }) => {
 		const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-		return `<pre class="bg-zinc-900 text-zinc-100 rounded-lg p-4 overflow-x-auto text-sm my-3"><code class="language-${lang || 'text'}">${escapedText}</code></pre>`;
+		return `<pre class="bg-bg-surface text-fg-bright rounded-lg p-4 overflow-x-auto text-sm my-3"><code class="language-${lang || 'text'}">${escapedText}</code></pre>`;
 	};
 	marked.use({ renderer });
 </script>
@@ -16,7 +16,7 @@
 </script>
 
 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-<div class="markdown-content prose prose-invert prose-sm max-w-none overflow-x-auto">
+<div class="markdown-content prose prose-sm max-w-none overflow-x-auto prose-invert">
 	{@html html}
 </div>
 
@@ -27,7 +27,7 @@
 	}
 
 	.markdown-content :global(code:not(pre code)) {
-		background-color: var(--color-zinc-800);
+		background-color: var(--color-bg-overlay);
 		padding: 0.15em 0.4em;
 		border-radius: 0.25rem;
 		font-size: 0.85em;
@@ -45,17 +45,17 @@
 
 	.markdown-content :global(th),
 	.markdown-content :global(td) {
-		border: 1px solid var(--color-zinc-700);
+		border: 1px solid var(--color-border);
 		padding: 0.4em 0.8em;
 		text-align: left;
 	}
 
 	.markdown-content :global(th) {
-		background-color: var(--color-zinc-800);
+		background-color: var(--color-bg-overlay);
 		font-weight: 600;
 	}
 
 	.markdown-content :global(tr:nth-child(even)) {
-		background-color: var(--color-zinc-800, rgba(255, 255, 255, 0.03));
+		background-color: var(--color-bg-overlay, rgba(255, 255, 255, 0.03));
 	}
 </style>

@@ -1,11 +1,20 @@
 <!doctype html>
 
-<html lang="%paraglide.lang%" dir="%paraglide.dir%">
+<html lang="%paraglide.lang%" dir="%paraglide.dir%" class="theme-dark">
+	<script>
+		(function () {
+			var theme = localStorage.getItem('theme') || 'theme-dark';
+			document.documentElement.classList.add(theme);
+		})();
+	</script>
 	<head>
 		<meta charset="utf-8" />
-
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-
+		<meta
+			name="description"
+			content="Devlink — Remote Claude Code session manager. Create, monitor, and control AI coding sessions from your browser."
+		/>
+		<meta name="theme-color" content="#0d1117" />
 		%sveltekit.head%
 	</head>
 

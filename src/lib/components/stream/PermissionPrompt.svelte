@@ -52,14 +52,16 @@
 	</div>
 
 	{#if keyArg}
-		<div class="mb-3 overflow-x-auto rounded bg-zinc-900 px-3 py-2">
-			<p class="mb-0.5 text-xs text-zinc-500">{keyArg.label}</p>
-			<pre class="text-xs break-all whitespace-pre-wrap text-zinc-300">{keyArg.value}</pre>
+		<div class="mb-3 overflow-x-auto rounded bg-bg-surface px-3 py-2">
+			<p class="mb-0.5 text-xs text-fg-muted">{keyArg.label}</p>
+			<pre class="text-xs break-all whitespace-pre-wrap text-fg">{keyArg.value}</pre>
 		</div>
 	{/if}
 
 	{#if responded}
-		<p class="text-sm font-medium {responded === 'allowed' ? 'text-green-400' : 'text-red-400'}">
+		<p
+			class="text-sm font-medium {responded === 'allowed' ? 'text-status-ok' : 'text-status-error'}"
+		>
 			{responded === 'allowed' ? '✓ Allowed' : '✗ Denied'}
 		</p>
 	{:else}
@@ -67,7 +69,7 @@
 			<button
 				onclick={() => respond('allow')}
 				disabled={loading}
-				class="rounded bg-green-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-600 disabled:opacity-50"
+				class="rounded bg-status-ok px-3 py-1.5 text-xs font-medium text-fg-bright hover:bg-status-ok disabled:opacity-50"
 				>Allow</button
 			>
 			<button

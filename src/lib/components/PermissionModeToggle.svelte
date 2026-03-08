@@ -46,14 +46,14 @@
 	}
 </script>
 
-<div class="flex rounded border border-zinc-700 bg-zinc-800">
+<div class="flex rounded border border-border bg-bg-overlay">
 	{#each modes as m, i (m.value)}
 		<button
 			type="button"
 			onclick={() => setMode(m.value)}
 			disabled={loading}
 			class="flex-1 px-2 py-1 text-xs transition-colors disabled:opacity-60
-				{current === m.value ? 'bg-zinc-600 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}
+				{current === m.value ? 'bg-bg-active text-fg-bright' : 'text-fg-muted hover:text-fg'}
 				{i === 0 ? 'rounded-l' : ''}
 				{i === modes.length - 1 ? 'rounded-r' : ''}
 			">{m.label}</button

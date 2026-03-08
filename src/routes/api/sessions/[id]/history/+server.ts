@@ -16,6 +16,15 @@ export const GET: RequestHandler = async (event) => {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
 
+	let events: unknown[] = [];
+	if (row.events) {
+		try {
+			events = JSON.parse(row.events);
+		} catch {
+			// ignore malformed events
+		}
+	}
+
 	return json({
 		sessionId: row.id,
 		claudeSessionId: row.claudeSessionId,
@@ -24,6 +33,7 @@ export const GET: RequestHandler = async (event) => {
 		status: row.status,
 		totalCost: row.totalCost ? row.totalCost / 10000 : null,
 		createdAt: row.createdAt?.toISOString() ?? '',
-		endedAt: row.endedAt?.toISOString() ?? ''
+		endedAt: row.endedAt?.toISOString() ?? '',
+		events
 	});
 };

@@ -20,6 +20,7 @@ export const GET: RequestHandler = async (event) => {
 		status: s.status,
 		permissionMode: s.permissionMode,
 		model: s.model,
+		summary: s.summary ?? '',
 		createdAt: s.createdAt,
 		lastActivity: s.lastActivity,
 		totalCost: s.totalCost
@@ -81,6 +82,7 @@ export const POST: RequestHandler = async (event) => {
 			status: session.status,
 			permissionMode: session.permissionMode,
 			model: session.model,
+			summary: session.summary ?? '',
 			createdAt: session.createdAt,
 			lastActivity: session.lastActivity,
 			totalCost: session.totalCost

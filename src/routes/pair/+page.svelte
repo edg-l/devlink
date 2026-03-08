@@ -89,34 +89,38 @@
 	}
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-gray-50">
-	<div class="w-full max-w-md rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-200">
+<svelte:head>
+	<title>Pair Device | Devlink</title>
+</svelte:head>
+
+<div class="flex min-h-screen items-center justify-center bg-bg-surface">
+	<div class="w-full max-w-md rounded-xl bg-bg-overlay p-8 shadow-sm ring-1 ring-border">
 		{#if data.user}
 			<!-- Authenticated: generate code -->
 			<div class="text-center">
-				<h1 class="text-2xl font-bold text-gray-900">Pair a Device</h1>
-				<p class="mt-1 text-sm text-gray-500">
+				<h1 class="text-2xl font-bold text-fg-bright">Pair a Device</h1>
+				<p class="mt-1 text-sm text-fg-muted">
 					Generate a code and enter it on the device you want to pair.
 				</p>
 
 				{#if generateError}
-					<div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+					<div class="mt-4 rounded-lg bg-status-error/10 px-4 py-3 text-sm text-status-error">
 						{generateError}
 					</div>
 				{/if}
 
 				{#if generatedCode}
 					<div class="mt-8">
-						<p class="mb-2 text-sm text-gray-500">Your pairing code (valid for 5 minutes)</p>
+						<p class="mb-2 text-sm text-fg-muted">Your pairing code (valid for 5 minutes)</p>
 						<div
-							class="rounded-xl bg-gray-100 px-8 py-6 font-mono text-5xl font-bold tracking-widest text-gray-900"
+							class="rounded-xl bg-bg-overlay px-8 py-6 font-mono text-5xl font-bold tracking-widest text-fg-bright"
 						>
 							{generatedCode}
 						</div>
 						<button
 							onclick={handleGenerate}
 							disabled={generating}
-							class="mt-4 text-sm text-blue-600 hover:text-blue-500 disabled:opacity-50"
+							class="mt-4 text-sm text-fg-accent hover:text-fg-accent disabled:opacity-50"
 						>
 							Generate new code
 						</button>
@@ -125,7 +129,7 @@
 					<button
 						onclick={handleGenerate}
 						disabled={generating}
-						class="mt-8 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+						class="mt-8 w-full rounded-lg bg-fg-accent px-4 py-2 text-sm font-semibold text-btn-primary-fg shadow-sm hover:bg-fg-accent focus:ring-2 focus:ring-fg-accent focus:ring-offset-2 focus:outline-none disabled:opacity-50"
 					>
 						{generating ? 'Generating...' : 'Generate Pairing Code'}
 					</button>
@@ -134,33 +138,35 @@
 		{:else}
 			<!-- Unauthenticated: enter code -->
 			<div class="text-center">
-				<h1 class="text-2xl font-bold text-gray-900">Pair This Device</h1>
-				<p class="mt-1 text-sm text-gray-500">Enter the 6-digit code shown on your server.</p>
+				<h1 class="text-2xl font-bold text-fg-bright">Pair This Device</h1>
+				<p class="mt-1 text-sm text-fg-muted">
+					Enter the 6-digit code from your authenticated device.
+				</p>
 			</div>
 
 			{#if pairingSuccess}
 				<div class="mt-8 text-center">
-					<div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+					<div class="mb-4 rounded-lg bg-status-ok/10 px-4 py-3 text-sm text-status-ok">
 						Device paired successfully!
 					</div>
-					<p class="mb-4 text-sm text-gray-500">You can now log in with your account.</p>
+					<p class="mb-4 text-sm text-fg-muted">You can now log in with your account.</p>
 					<a
 						href={resolve('/login')}
-						class="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+						class="inline-block rounded-lg bg-fg-accent px-4 py-2 text-sm font-semibold text-btn-primary-fg shadow-sm hover:bg-fg-accent"
 					>
 						Go to Login
 					</a>
 				</div>
 			{:else}
 				{#if validateError}
-					<div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+					<div class="mt-4 rounded-lg bg-status-error/10 px-4 py-3 text-sm text-status-error">
 						{validateError}
 					</div>
 				{/if}
 
 				<form onsubmit={handleValidate} class="mt-8 space-y-6">
 					<div>
-						<label for="digit-0" class="mb-3 block text-sm font-medium text-gray-700">
+						<label for="digit-0" class="mb-3 block text-sm font-medium text-fg">
 							Pairing Code
 						</label>
 						<div class="flex justify-center gap-2">
@@ -174,38 +180,39 @@
 									oninput={(e) => handleDigitInput(i, e)}
 									onkeydown={(e) => handleDigitKeydown(i, e)}
 									onpaste={handleDigitPaste}
-									class="h-12 w-10 rounded-lg border border-gray-300 text-center font-mono text-xl font-bold shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+									class="h-12 w-10 rounded-lg border border-border bg-bg-input text-center font-mono text-xl font-bold text-fg shadow-sm focus:border-fg-accent focus:ring-1 focus:ring-fg-accent focus:outline-none"
 								/>
 							{/each}
 						</div>
 					</div>
 
 					<div>
-						<label for="deviceName" class="block text-sm font-medium text-gray-700"
-							>Device Name <span class="text-gray-400">(optional)</span></label
+						<label for="deviceName" class="block text-sm font-medium text-fg"
+							>Device Name <span class="text-fg-muted">(optional)</span></label
 						>
 						<input
 							id="deviceName"
 							type="text"
 							bind:value={deviceName}
 							placeholder="e.g. My Laptop"
-							class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+							class="mt-1 block w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-fg placeholder-fg-faint shadow-sm focus:border-fg-accent focus:ring-1 focus:ring-fg-accent focus:outline-none"
 						/>
 					</div>
 
 					<button
 						type="submit"
 						disabled={validating}
-						class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+						class="w-full rounded-lg bg-fg-accent px-4 py-2 text-sm font-semibold text-btn-primary-fg shadow-sm hover:bg-fg-accent focus:ring-2 focus:ring-fg-accent focus:ring-offset-2 focus:outline-none disabled:opacity-50"
 					>
 						{validating ? 'Verifying...' : 'Pair Device'}
 					</button>
 				</form>
 			{/if}
 
-			<p class="mt-6 text-center text-sm text-gray-500">
+			<p class="mt-6 text-center text-sm text-fg-muted">
 				Already paired?
-				<a href={resolve('/login')} class="font-medium text-blue-600 hover:text-blue-500">Sign in</a
+				<a href={resolve('/login')} class="font-medium text-fg-accent hover:text-fg-accent"
+					>Sign in</a
 				>
 			</p>
 		{/if}

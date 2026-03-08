@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { connectSSE } from '$lib/client/sse';
 	import { parseEvent, mergeToolResults, type Block } from '$lib/client/event-parser';
 	import StreamView from '$lib/components/stream/StreamView.svelte';
 	import PermissionModeToggle from '$lib/components/PermissionModeToggle.svelte';
 	import type { PermissionMode } from '$lib/types';
+	import { models, modelLabel } from '$lib/models';
 
 	let sessionId = $derived($page.params.id ?? '');
 
@@ -35,6 +37,28 @@
 	let mode = $state<'active' | 'history'>('active');
 	let historyProjectPath = $state('');
 	let historyClaudeSessionId = $state('');
+
+	// Model switching
+	let switchingModel = $state(false);
+
+	async function switchModel(newModel: string) {
+		if (!sessionMeta || newModel === sessionMeta.model || switchingModel) return;
+		switchingModel = true;
+		try {
+			const res = await fetch(`/api/sessions/${sessionId}/model`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ model: newModel })
+			});
+			if (res.ok) {
+				sessionMeta = { ...sessionMeta, model: newModel };
+			}
+		} catch {
+			// Ignore
+		} finally {
+			switchingModel = false;
+		}
+	}
 
 	// Prompt input
 	let promptText = $state('');
@@ -98,8 +122,18 @@
 
 				// Handle session status updates
 				if (type === 'session_status') {
-					const d = data as { status?: string };
+					const d = data as { status?: string; error?: string };
 					if (d.status) status = d.status;
+					if (d.error) {
+						addRawBlocks([
+							{
+								id: `block-error-${Date.now()}`,
+								type: 'error',
+								timestamp: new Date(),
+								message: d.error
+							}
+						]);
+					}
 					return;
 				}
 
@@ -148,6 +182,7 @@
 					totalCost?: number | null;
 					createdAt: string;
 					endedAt: string;
+					events?: Array<{ type: string; [key: string]: unknown }>;
 				};
 				mode = 'history';
 				status = 'history';
@@ -163,6 +198,11 @@
 					lastActivity: data.endedAt || data.createdAt,
 					totalCost: data.totalCost ?? undefined
 				};
+				// Replay persisted events into the stream view
+				if (data.events?.length) {
+					const parsed = data.events.flatMap((ev) => parseEvent(ev));
+					if (parsed.length > 0) addRawBlocks(parsed);
+				}
 				return;
 			}
 		} catch {
@@ -241,7 +281,7 @@
 			});
 			if (res.ok) {
 				const newSession = (await res.json()) as { id: string };
-				goto(`/session/${newSession.id}`);
+				goto(resolve(`/session/${newSession.id}`));
 			}
 		} catch {
 			// Ignore
@@ -307,41 +347,56 @@
 	});
 </script>
 
+<svelte:head>
+	<title>{sessionMeta?.projectPath?.split('/').filter(Boolean).pop() ?? 'Session'} | Devlink</title>
+</svelte:head>
+
 <div class="flex h-full flex-col">
 	<!-- Session header -->
-	<div class="flex flex-shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-4 py-3">
+	<div class="flex flex-shrink-0 items-center gap-3 border-b border-border bg-bg-surface px-4 py-3">
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2">
 				<span
 					class="h-2 w-2 flex-shrink-0 rounded-full
 					{status === 'running' || status === 'starting'
-						? 'bg-green-400'
+						? 'bg-status-ok'
 						: status === 'error'
-							? 'bg-red-400'
+							? 'bg-status-error'
 							: status === 'history'
-								? 'bg-zinc-600'
-								: 'bg-zinc-500'}
+								? 'bg-fg-faint'
+								: 'bg-fg-muted'}
 				"
 				></span>
-				<span class="truncate text-sm font-medium text-zinc-200">
+				<span class="truncate text-sm font-medium text-fg">
 					{sessionMeta?.projectPath?.split('/').filter(Boolean).pop() ?? sessionId}
 				</span>
-				{#if sessionMeta?.model}
-					<span class="text-xs text-zinc-500">{sessionMeta.model}</span>
+				{#if mode === 'active' && sessionMeta?.model}
+					<select
+						value={sessionMeta.model}
+						onchange={(e) => switchModel(e.currentTarget.value)}
+						disabled={switchingModel}
+						class="rounded border border-border bg-bg-overlay px-1.5 py-0.5 text-xs text-fg-muted focus:border-border-active focus:outline-none disabled:opacity-50"
+					>
+						{#each models as m (m.value)}
+							<option value={m.value}>{m.label}</option>
+						{/each}
+					</select>
+				{:else if sessionMeta?.model}
+					<span class="text-xs text-fg-muted">{modelLabel(sessionMeta.model)}</span>
 				{/if}
 				{#if mode === 'active'}
-					<span class="text-xs text-zinc-600">{elapsedDisplay}</span>
+					<span class="text-xs text-fg-faint">{elapsedDisplay}</span>
 				{/if}
 			</div>
 			{#if sessionMeta?.projectPath}
-				<p class="mt-0.5 truncate text-xs text-zinc-600">{sessionMeta.projectPath}</p>
+				<p class="mt-0.5 truncate text-xs text-fg-faint">{sessionMeta.projectPath}</p>
 			{/if}
 		</div>
 
 		{#if mode === 'history'}
 			<button
 				onclick={resumeSession}
-				class="flex-shrink-0 rounded border border-zinc-600 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+				class="flex-shrink-0 rounded border border-border-active px-3 py-1 text-xs text-fg hover:bg-bg-overlay"
 			>
 				Resume
 			</button>
@@ -366,7 +421,7 @@
 
 	<!-- Status bar -->
 	<div
-		class="flex flex-shrink-0 items-center gap-4 border-t border-zinc-800 bg-zinc-900 px-4 py-1.5 text-xs text-zinc-500"
+		class="flex flex-shrink-0 items-center gap-4 border-t border-border bg-bg-surface px-4 py-1.5 text-xs text-fg-muted"
 	>
 		<span>status: {status}</span>
 		{#if lastResult}
@@ -388,36 +443,36 @@
 
 	<!-- Prompt input bar (active) or resume bar (history) -->
 	{#if mode === 'active'}
-		<div class="flex flex-shrink-0 items-end gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
+		<div class="flex flex-shrink-0 items-end gap-2 border-t border-border bg-bg-surface px-4 py-3">
 			<textarea
 				bind:value={promptText}
 				use:autogrow
 				onkeydown={handleKeydown}
 				placeholder="Send a message… (Shift+Enter for newline)"
 				rows="1"
-				class="min-h-[36px] flex-1 resize-none rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+				class="min-h-[36px] flex-1 resize-none rounded border border-border bg-bg-overlay px-3 py-2 text-sm text-fg placeholder-fg-faint focus:border-border-active focus:outline-none"
 			></textarea>
 			<button
 				onclick={sendMessage}
 				disabled={!promptText.trim() || sending}
-				class="flex-shrink-0 rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
+				class="flex-shrink-0 rounded bg-btn-primary-bg px-3 py-2 text-sm font-medium text-btn-primary-fg hover:bg-btn-hover disabled:opacity-40"
 			>
 				{sending ? '…' : 'Send'}
 			</button>
 		</div>
 	{:else}
-		<div class="flex flex-shrink-0 items-end gap-2 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
+		<div class="flex flex-shrink-0 items-end gap-2 border-t border-border bg-bg-surface px-4 py-3">
 			<textarea
 				bind:value={promptText}
 				use:autogrow
 				onkeydown={handleKeydown}
 				placeholder="Optional message to resume with… (Ctrl+Enter)"
 				rows="1"
-				class="min-h-[36px] flex-1 resize-none rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+				class="min-h-[36px] flex-1 resize-none rounded border border-border bg-bg-overlay px-3 py-2 text-sm text-fg placeholder-fg-faint focus:border-border-active focus:outline-none"
 			></textarea>
 			<button
 				onclick={resumeSession}
-				class="flex-shrink-0 rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
+				class="flex-shrink-0 rounded bg-btn-primary-bg px-3 py-2 text-sm font-medium text-btn-primary-fg hover:bg-btn-hover"
 			>
 				Resume
 			</button>

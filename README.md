@@ -1,42 +1,56 @@
-# sv
+# Devlink
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A web-based remote session manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Create, monitor, and control AI coding sessions from your browser.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **Session management** — Create sessions, stream output in real-time via SSE, view history, resume previous sessions, track costs
+- **Per-project organization** — Sessions grouped by project with configurable working directories
+- **Permission modes** — Plan (read-only), Ask (prompt for approval), Auto-Edit (accept file changes), Auto (fully autonomous), switchable mid-session
+- **Model switching** — Switch between Claude Opus, Sonnet, and Haiku mid-session
+- **Device pairing** — 6-digit code-based pairing for accessing sessions from multiple devices
+- **Rich streaming UI** — Syntax-highlighted code blocks, tool cards (Bash, Edit, Read, Write, Glob, Grep), thinking blocks, diff rendering, terminal output
+- **Themes** — Light and dark mode with persistence
+
+## Tech Stack
+
+- **Frontend**: Svelte 5, SvelteKit, Tailwind CSS 4
+- **Backend**: SvelteKit server routes, SQLite via Drizzle ORM
+- **Auth**: Better-Auth (email/password)
+- **Rendering**: Shiki (syntax highlighting), Marked (markdown), diff2html, ansi-to-html
+- **I18n**: Paraglide (en, es)
+- **Testing**: Vitest, Playwright
+
+## Getting Started
 
 ```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.12.5 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:node" devtools-json mcp="ide:claude-code+setup:local" better-auth="demo:password" paraglide="languageTags:en, es+demo:no" drizzle="database:sqlite+sqlite:better-sqlite3" playwright vitest="usages:unit,component" --install npm devlink
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
+
+On first visit you'll be prompted to create an admin account at `/setup`.
 
 ## Building
-
-To create a production version of your app:
 
 ```sh
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+Uses `@sveltejs/adapter-node` — run the output with `node build`.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## API
+
+| Method     | Route                        | Description            |
+| ---------- | ---------------------------- | ---------------------- |
+| `GET`      | `/api/sessions`              | List active sessions   |
+| `POST`     | `/api/sessions`              | Create new session     |
+| `GET`      | `/api/sessions/[id]/stream`  | SSE event stream       |
+| `POST`     | `/api/sessions/[id]/message` | Send message           |
+| `POST`     | `/api/sessions/[id]/stop`    | Stop session           |
+| `POST`     | `/api/sessions/[id]/mode`    | Change permission mode |
+| `PATCH`    | `/api/sessions/[id]/model`   | Switch model           |
+| `GET`      | `/api/sessions/history`      | Session history        |
+| `GET`      | `/api/sessions/[id]/history` | Single session history |
+| `GET/POST` | `/api/projects`              | List/create projects   |
+| `POST`     | `/api/pair/generate`         | Generate pairing code  |
+| `POST`     | `/api/pair/validate`         | Validate pairing code  |

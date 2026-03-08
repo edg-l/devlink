@@ -17,20 +17,20 @@
 <ToolCard toolName="Bash" {input} {result}>
 	<div class="space-y-2 px-3 py-2">
 		{#if input.description}
-			<p class="text-xs text-zinc-400 italic">{input.description}</p>
+			<p class="text-xs text-fg-muted italic">{input.description}</p>
 		{/if}
 
 		<pre
-			class="overflow-x-auto rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-100">{input.command}</pre>
+			class="overflow-x-auto rounded bg-bg-surface p-3 font-mono text-xs text-fg-bright">{input.command}</pre>
 
 		{#if input.timeout}
-			<p class="text-xs text-zinc-500">timeout: {input.timeout}ms</p>
+			<p class="text-xs text-fg-muted">timeout: {input.timeout}ms</p>
 		{/if}
 
 		{#if result}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 			<div
-				class="max-h-80 overflow-x-auto overflow-y-auto rounded bg-black p-3 font-mono text-xs text-zinc-100"
+				class="max-h-80 overflow-x-auto overflow-y-auto rounded bg-bg p-3 font-mono text-xs text-fg-bright"
 			>
 				{@html resultHtml}
 			</div>

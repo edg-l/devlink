@@ -35,30 +35,32 @@
 	<div class="flex flex-wrap items-center gap-x-4 gap-y-1">
 		<!-- Status indicator -->
 		<span
-			class="flex items-center gap-1.5 font-medium {success ? 'text-green-400' : 'text-red-400'}"
+			class="flex items-center gap-1.5 font-medium {success
+				? 'text-status-ok'
+				: 'text-status-error'}"
 		>
 			<span>{success ? '✓' : '✗'}</span>
 			<span>{success ? 'Done' : 'Error'}</span>
 		</span>
 
 		<!-- Duration -->
-		<span class="text-zinc-400">
-			<span class="text-zinc-500">time:</span>
+		<span class="text-fg-muted">
+			<span class="text-fg-muted">time:</span>
 			{durationSec}s
 		</span>
 
 		<!-- Cost -->
-		<span class="text-zinc-400">
-			<span class="text-zinc-500">cost:</span>
+		<span class="text-fg-muted">
+			<span class="text-fg-muted">cost:</span>
 			{costStr}
 		</span>
 
 		<!-- Token counts -->
-		<span class="text-zinc-400">
-			<span class="text-zinc-500">tokens:</span>
+		<span class="text-fg-muted">
+			<span class="text-fg-muted">tokens:</span>
 			{totalTokens.toLocaleString()}
 			{#if usage.cacheReadTokens > 0 || usage.cacheCreationTokens > 0}
-				<span class="text-zinc-500">
+				<span class="text-fg-muted">
 					({(usage.cacheReadTokens + usage.cacheCreationTokens).toLocaleString()} cached)
 				</span>
 			{/if}
@@ -66,12 +68,12 @@
 
 		<!-- Stop reason -->
 		{#if stopReason && stopReason !== 'end_turn'}
-			<span class="text-xs text-zinc-500">stop: {stopReason}</span>
+			<span class="text-xs text-fg-muted">stop: {stopReason}</span>
 		{/if}
 	</div>
 
 	<!-- Error text if present -->
 	{#if !success && resultText}
-		<p class="mt-2 text-xs text-red-300">{resultText}</p>
+		<p class="mt-2 text-xs text-status-error">{resultText}</p>
 	{/if}
 </div>

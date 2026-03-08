@@ -37,7 +37,8 @@ export const claudeSession = sqliteTable('claude_session', {
 		.notNull()
 		.$defaultFn(() => new Date()),
 	endedAt: integer('ended_at', { mode: 'timestamp' }),
-	summary: text('summary').default('')
+	summary: text('summary').default(''),
+	events: text('events')
 });
 
 export * from './auth.schema';

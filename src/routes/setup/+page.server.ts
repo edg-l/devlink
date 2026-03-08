@@ -1,7 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
-import { APIError } from 'better-auth/api';
 import { db } from '$lib/server/db';
 import { sql } from 'drizzle-orm';
 
@@ -30,18 +29,20 @@ export const actions: Actions = {
 		}
 
 		try {
-			await auth.api.signUpEmail({
+			const result = await auth.api.signUpEmail({
+				headers: event.request.headers,
 				body: {
 					email,
 					password,
 					name: email.split('@')[0]
 				}
 			});
-		} catch (error) {
-			if (error instanceof APIError) {
-				return fail(400, { message: error.message || 'Registration failed' });
+
+			if (!result.token) {
+				return fail(400, { message: 'Registration failed' });
 			}
-			return fail(500, { message: 'Unexpected error during setup' });
+		} catch {
+			return fail(400, { message: 'Registration failed' });
 		}
 
 		redirect(303, '/');
